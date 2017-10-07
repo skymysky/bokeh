@@ -38,6 +38,10 @@ been deprecated. The ``sizing_mode`` enum should be used instead. Use
 The function ``bokeh.sampledata.population.load_population`` has been
 deprecated. Use the attribute ``bokeh.sampledata.population.data`` instead.
 
+``Plot.toolbar_sticky`` isn't needed anymore as was deprecated. You can achieve
+similar results to ``toolbar_sticky=False`` by manually creating a layout with
+a plot and ``ToolbarBox``.
+
 Code Moves
 ~~~~~~~~~~
 

@@ -1,22 +1,75 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Models for controlling the text and visual formatting of tick
 labels on Bokeh plot axes.
 
 '''
-from __future__ import absolute_import
 
-from types import FunctionType
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from bokeh.util.string import format_docstring
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from ..core.enums import LatLon, NumeralLanguage, RoundingFunction
 from ..core.has_props import abstract
-from ..core.properties import Auto, Bool, Dict, Either, Enum, Instance, Int, List, String
+from ..core.properties import (
+    AnyRef,
+    Auto,
+    Bool,
+    Dict,
+    Either,
+    Enum,
+    Instance,
+    Int,
+    List,
+    String,
+)
 from ..core.validation import error
 from ..core.validation.errors import MISSING_MERCATOR_DIMENSION
 from ..model import Model
-from ..util.compiler import nodejs_compile, CompilationError
-from ..util.dependencies import import_required
-from ..util.future import get_param_info, signature
+from ..util.string import format_docstring
 from .tickers import Ticker
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'TickFormatter',
+    'BasicTickFormatter',
+    'MercatorTickFormatter',
+    'NumeralTickFormatter',
+    'PrintfTickFormatter',
+    'LogTickFormatter',
+    'CategoricalTickFormatter',
+    'FuncTickFormatter',
+    'DatetimeTickFormatter',
+)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+def _DATETIME_TICK_FORMATTER_HELP(field):
+    return """
+    Formats for displaying datetime values in the %s range.
+
+    See the :class:`~bokeh.models.formatters.DatetimeTickFormatter` help for a list of all supported formats.
+    """ % field
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 @abstract
 class TickFormatter(Model):
@@ -55,7 +108,7 @@ class BasicTickFormatter(TickFormatter):
     """)
 
 class MercatorTickFormatter(BasicTickFormatter):
-    ''' TickFormatter for values in WebMercator units.
+    ''' A ``TickFormatter`` for values in WebMercator units.
 
     Some map plot types internally use WebMercator to describe coordinates,
     plot bounds, etc. These units are not very human-friendly. This tick
@@ -77,7 +130,7 @@ class MercatorTickFormatter(BasicTickFormatter):
     should be `"lat"``.
 
     In order to prevent hard to debug errors, there is no default value for
-    dimension. Using an un-configured MercatorTickFormatter will result in
+    dimension. Using an un-configured ``MercatorTickFormatter`` will result in
     a validation error and a JavaScript console error.
     """)
 
@@ -242,77 +295,18 @@ class CategoricalTickFormatter(TickFormatter):
 class FuncTickFormatter(TickFormatter):
     ''' Display tick values that are formatted by a user-defined function.
 
+    .. warning::
+        The explicit purpose of this Bokeh Model is to embed *raw JavaScript
+        code* for a browser to execute. If any part of the code is derived
+        from untrusted user inputs, then you must take appropriate care to
+        sanitize the user input prior to passing to Bokeh.
+
     '''
 
-    @classmethod
-    def from_py_func(cls, func):
-        ''' Create a FuncTickFormatter instance from a Python function. The
-        function is translated to JavaScript using PyScript. The variable
-        ``tick`` will contain the unformatted tick value and can be expected to
-        be present in the function namespace at render time.
-
-        Example:
-
-        .. code-block:: python
-
-            code = """
-            def ticker():
-                return "{:.0f} + {:.2f}".format(tick, tick % 1)
-            """
-
-        The python function must have no positional arguments. It's
-        possible to pass Bokeh models (e.g. a ColumnDataSource) as keyword
-        arguments to the function.
-
-        '''
-        if not isinstance(func, FunctionType):
-            raise ValueError('CustomJS.from_py_func needs function object.')
-        pyscript = import_required('flexx.pyscript',
-                                   'To use Python functions for CustomJS, you need Flexx ' +
-                                   '("conda install -c bokeh flexx" or "pip install flexx")')
-        sig = signature(func)
-
-        all_names, default_values = get_param_info(sig)
-
-        if len(all_names) - len(default_values) != 0:
-            raise ValueError("Function `func` may only contain keyword arguments.")
-
-        if default_values and not any([isinstance(value, Model) for value in default_values]):
-            raise ValueError("Default value must be a Bokeh Model.")
-
-        func_kwargs = dict(zip(all_names, default_values))
-
-        # Wrap the code attr in a function named `formatter` and call it
-        # with arguments that match the `args` attr
-        code = pyscript.py2js(func, 'formatter') + 'return formatter(%s);\n' % ', '.join(all_names)
-
-        return cls(code=code, args=func_kwargs)
-
-    @classmethod
-    def from_coffeescript(cls, code, args={}):
-        ''' Create a FuncTickFormatter instance from a CoffeeScript snippet.
-        The function body is translated to JavaScript using node. The variable
-        ``tick`` will contain the unformatted tick value and can be expected to
-        be present in the code snippet namespace at render time.
-
-        Example:
-
-        .. code-block:: coffeescript
-
-            code = """
-            return Math.floor(tick) + " + " + (tick % 1).toFixed(2)
-            """
-        '''
-        compiled = nodejs_compile(code, lang="coffeescript", file="???")
-        if "error" in compiled:
-            raise CompilationError(compiled.error)
-        else:
-            return cls(code=compiled.code, args=args)
-
-    args = Dict(String, Instance(Model), help="""
-    A mapping of names to Bokeh plot objects. These objects are made
-    available to the formatter code snippet as the values of named
-    parameters to the callback.
+    args = Dict(String, AnyRef, help="""
+    A mapping of names to Python objects. In particular those can be bokeh's models.
+    These objects are made available to the formatter's code snippet as the values of
+    named parameters to the callback.
     """)
 
     code = String(default="", help="""
@@ -320,21 +314,24 @@ class FuncTickFormatter(TickFormatter):
     format. The variable ``tick`` will contain the unformatted tick value and
     can be expected to be present in the code snippet namespace at render time.
 
+    Additionally available variables are:
+
+      * ``ticks``, an array of all axis ticks as positioned by the ticker,
+      * ``index``, the position of ``tick`` within ``ticks``, and
+      * the keys of ``args`` mapping, if any.
+
+    Finding yourself needing to cache an expensive ``ticks``-dependent
+    computation, you can store it on the ``this`` variable.
+
     Example:
 
         .. code-block:: javascript
 
             code = '''
-            return Math.floor(tick) + " + " + (tick % 1).toFixed(2)
+            this.precision = this.precision || (ticks.length > 5 ? 1 : 2);
+            return Math.floor(tick) + " + " + (tick % 1).toFixed(this.precision);
             '''
     """)
-
-def _DATETIME_TICK_FORMATTER_HELP(field):
-    return """
-    Formats for displaying datetime values in the %s range.
-
-    See the :class:`~bokeh.models.formatters.DatetimeTickFormatter` help for a list of all supported formats.
-    """ % field
 
 class DatetimeTickFormatter(TickFormatter):
     ''' A ``TickFormatter`` for displaying datetime values nicely across a
@@ -574,11 +571,19 @@ class DatetimeTickFormatter(TickFormatter):
 
     months       = List(String,
                         help=_DATETIME_TICK_FORMATTER_HELP("``months``"),
-                        default=['%m/%Y', '%b%y']).accepts(String, lambda fmt: [fmt])
+                        default=['%m/%Y', '%b %Y']).accepts(String, lambda fmt: [fmt])
 
     years        = List(String,
                         help=_DATETIME_TICK_FORMATTER_HELP("``years``"),
                         default=['%Y']).accepts(String, lambda fmt: [fmt])
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
 
 # This is to automate documentation of DatetimeTickFormatter formats and their defaults
 _df = DatetimeTickFormatter()

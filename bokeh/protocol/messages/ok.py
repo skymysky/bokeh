@@ -1,22 +1,48 @@
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
-from ..message import Message
-from . import register
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
 
-@register
-class ok_1(Message):
-    ''' Define the ``OK`` message (revision 1) for acknowledging successful
-    handling of a previous message.
+# Bokeh imports
+from ..message import Message
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'ok',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class ok(Message):
+    ''' Define the ``OK`` message for acknowledging successful handling of a
+    previous message.
 
     The ``content`` fragment of for this message is empty.
 
     '''
 
     msgtype  = 'OK'
-    revision = 1
 
     @classmethod
     def create(cls, request_id, **metadata):
@@ -32,3 +58,11 @@ class ok_1(Message):
         '''
         header = cls.create_header(request_id=request_id)
         return cls(header, metadata, {})
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

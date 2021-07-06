@@ -28,9 +28,9 @@ DEFAULTS = {
 class Surface3d(LayoutDOM):
 
     # The special class attribute ``__implementation__`` should contain a string
-    # of JavaScript (or CoffeeScript) code that implements the JavaScript side
+    # of JavaScript (or TypeScript) code that implements the JavaScript side
     # of the custom extension model.
-    __implementation__ = "surface3d.coffee"
+    __implementation__ = "surface3d.ts"
 
     # Below are all the "properties" for this model. Bokeh properties are
     # class attributes that define the fields (and their types) that can be
@@ -38,23 +38,21 @@ class Surface3d(LayoutDOM):
     # also support type validation. More information about properties in
     # can be found here:
     #
-    #    https://bokeh.pydata.org/en/latest/docs/reference/core.html#bokeh-core-properties
+    #    https://docs.bokeh.org/en/latest/docs/reference/core/properties.html#bokeh-core-properties
 
     # This is a Bokeh ColumnDataSource that can be updated in the Bokeh
     # server by Python code
     data_source = Instance(ColumnDataSource)
 
-    # The vis.js library that we are wrapping expects data for x, y, z, and
-    # color. The data will actually be stored in the ColumnDataSource, but
-    # these properties let us specify the *name* of the column that should
-    # be used for each field.
+    # The vis.js library that we are wrapping expects data for x, y, and z.
+    # The data will actually be stored in the ColumnDataSource, but these
+    # properties let us specify the *name* of the column that should be
+    # used for each field.
     x = String
 
     y = String
 
     z = String
-
-    color = String
 
     # Any of the available vis.js options for Graph3d can be set by changing
     # the contents of this dictionary.

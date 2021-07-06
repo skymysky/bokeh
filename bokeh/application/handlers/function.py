@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a Bokeh Application Handler to build up documents by running
 a specified Python function.
 
@@ -22,10 +28,36 @@ For complete examples of this technique, see
 :bokeh-tree:`examples/howto/server_embed`
 
 '''
-from __future__ import absolute_import, print_function
 
-from .handler import Handler
-from bokeh.util.callback_manager import _check_callback
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ...util.callback_manager import _check_callback
+from .handler import Handler, handle_exception
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'FunctionHandler',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class FunctionHandler(Handler):
     ''' A Handler that accepts a plain python function to use for modifying
@@ -48,7 +80,7 @@ class FunctionHandler(Handler):
 
     '''
 
-    def __init__(self, func):
+    def __init__(self, func, *, trap_exceptions=False):
         '''
 
         Args:
@@ -64,23 +96,19 @@ class FunctionHandler(Handler):
                 and it  should return the passed-in document after making any
                 modifications in-place.
 
+            trap_exceptions (bool) : should exceptions in `func` be caught and
+                logged or allowed to propagate
+
         '''
-        super(FunctionHandler, self).__init__()
+        super().__init__()
 
         _check_callback(func, ('doc',))
 
         self._func = func
+        self._trap_exceptions = trap_exceptions
         self._safe_to_fork = True
 
-    def modify_document(self, doc):
-        ''' Execute the configured ``func`` to modify the document.
-
-        After this method is first executed, ``safe_to_fork`` will return
-        ``False``.
-
-        '''
-        self._func(doc)
-        self._safe_to_fork = False
+    # Properties --------------------------------------------------------------
 
     @property
     def safe_to_fork(self):
@@ -90,3 +118,30 @@ class FunctionHandler(Handler):
 
         '''
         return self._safe_to_fork
+
+    # Public methods ----------------------------------------------------------
+
+    def modify_document(self, doc):
+        ''' Execute the configured ``func`` to modify the document.
+
+        After this method is first executed, ``safe_to_fork`` will return
+        ``False``.
+
+        '''
+        try:
+            self._func(doc)
+        except Exception as e:
+            if self._trap_exceptions:
+                handle_exception(self, e)
+            else:
+                raise
+        finally:
+            self._safe_to_fork = False
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

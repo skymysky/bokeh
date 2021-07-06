@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,39 +11,33 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
-# Standard library imports
-
-# External imports
-from six import string_types
-
 # Bokeh imports
-from ..util.future import with_metaclass
 from .rgb import RGB
 
 #-----------------------------------------------------------------------------
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'ColorGroup',
+    'NamedColor',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Private API
 #-----------------------------------------------------------------------------
 
-# Normally this would go under Private API but it is needed to define ColorGroup
 class _ColorGroupMeta(type):
     ''' This metaclass enables ColorGroup class types to be used like simple
     enumerations.
@@ -57,7 +50,7 @@ class _ColorGroupMeta(type):
 
     def __getitem__(self, v):
         from . import named
-        if isinstance(v, string_types):
+        if isinstance(v, str):
             if v in self._colors:
                 return getattr(named, v.lower())
             raise KeyError("Color group %r has no color %r" % (self.__class__.__name__, v))
@@ -73,17 +66,19 @@ class _ColorGroupMeta(type):
 
     def __getattr__(self, v):
         from . import named
-        if v is not "_colors" and v in self._colors:
+        if v != "_colors" and v in self._colors:
             return getattr(named, v.lower())
-        return super(_ColorGroupMeta, self).__getattr__(v)
+        return super().__getattr__(v)
 
-@internal((1,0,0))
-class ColorGroup(with_metaclass(_ColorGroupMeta)):
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class ColorGroup(metaclass=_ColorGroupMeta):
     ''' Collect a group of named colors into an iterable, indexable group.
 
     '''
 
-@internal((1,0,0))
 class NamedColor(RGB):
     ''' Represent a CSS named color, provided as RGB values.
 
@@ -115,18 +110,13 @@ class NamedColor(RGB):
             self.__all__.append(name)
 
         self.name = name
-        super(NamedColor, self).__init__(r, g, b)
+        super().__init__(r, g, b)
 
-    @internal((1,0,0))
     def to_css(self):
         '''
 
         '''
         return self.name
-
-#-----------------------------------------------------------------------------
-# Private API
-#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Code

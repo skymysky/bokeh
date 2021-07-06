@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,20 +11,12 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
-
-# Standard library imports
-
-# External imports
 
 # Bokeh imports
 from .notebook import run_notebook_hook
@@ -35,16 +26,21 @@ from .state import curstate
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'output_file',
+    'output_notebook',
+    'reset_output',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-def output_file(filename, title="Bokeh Plot", mode="cdn", root_dir=None):
+def output_file(filename, title="Bokeh Plot", mode=None, root_dir=None):
     '''Configure the default output state to generate output saved
     to a file when :func:`show` is called.
 
-    Does not change the current Document from curdoc(). File and notebook
+    Does not change the current ``Document`` from ``curdoc()``. File and notebook
     output may be active at the same time, so e.g., this does not clear the
     effects of ``output_notebook()``.
 
@@ -80,10 +76,11 @@ def output_file(filename, title="Bokeh Plot", mode="cdn", root_dir=None):
         root_dir=root_dir
     )
 
-@public((1,0,0))
 def output_notebook(resources=None, verbose=False, hide_banner=False, load_timeout=5000, notebook_type='jupyter'):
     ''' Configure the default output state to generate output in notebook cells
-    when :func:`show` is called.
+    when :func:`show` is called. Note that, :func:`show` may be called multiple
+    times in a single cell to display multiple objects in the output cell. The
+    objects will be displayed in order.
 
     Args:
         resources (Resource, optional) :
@@ -113,7 +110,6 @@ def output_notebook(resources=None, verbose=False, hide_banner=False, load_timeo
     curstate().output_notebook(notebook_type)
     run_notebook_hook(notebook_type, 'load', resources, verbose, hide_banner, load_timeout)
 
-@public((1,0,0))
 def reset_output(state=None):
     ''' Clear the default state of all output modes.
 
@@ -124,7 +120,7 @@ def reset_output(state=None):
     curstate().reset()
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

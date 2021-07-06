@@ -1,21 +1,17 @@
-from __future__ import print_function
-
-from math import pi, sin, cos
+from math import cos, pi, sin
 
 from bokeh.document import Document
 from bokeh.embed import file_html
+from bokeh.models import Arc, Circle, ColumnDataSource, Plot, Range1d, Ray, Text
 from bokeh.resources import INLINE
 from bokeh.util.browser import view
-
-from bokeh.models.glyphs import Circle, Arc, Ray, Text
-from bokeh.models import ColumnDataSource, Range1d, Plot
 
 xdr = Range1d(start=-1.25, end=1.25)
 ydr = Range1d(start=-1.25, end=1.25)
 
 plot = Plot(x_range=xdr, y_range=ydr, plot_width=600, plot_height=600)
-plot.title.text = "Speedometer"
 plot.toolbar_location = None
+plot.outline_line_color = None
 
 start_angle = pi + pi/4
 end_angle = -pi/4
@@ -52,7 +48,6 @@ def polar_to_cartesian(r, alpha):
 
 def add_gauge(radius, max_value, length, direction, color, major_step, minor_step):
     major_angles, minor_angles = [], []
-    major_labels, minor_labels = [], []
 
     total_angle = start_angle - end_angle
 
@@ -72,11 +67,9 @@ def add_gauge(radius, max_value, length, direction, color, major_step, minor_ste
         minor_angle += minor_angle_step
 
     major_labels = [ major_step*i for i, _ in enumerate(major_angles) ]
-    minor_labels = [ minor_step*i for i, _ in enumerate(minor_angles) ]
 
     n = major_step/minor_step
     minor_angles = [ x for i, x in enumerate(minor_angles) if i % n != 0 ]
-    minor_labels = [ x for i, x in enumerate(minor_labels) if i % n != 0 ]
 
     glyph = Arc(x=0, y=0, radius=radius, start_angle=start_angle, end_angle=end_angle, direction="clock", line_color=color, line_width=2)
     plot.add_glyph(glyph)

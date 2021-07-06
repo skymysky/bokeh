@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -14,12 +13,8 @@ the associated value.
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -27,8 +22,6 @@ from bokeh.util.api import public, internal ; public, internal
 
 # Standard library imports
 import csv
-
-# External imports
 
 # Bokeh imports
 from ..util.sampledata import external_path, open_csv
@@ -42,11 +35,11 @@ __all__ = (
 )
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -58,8 +51,8 @@ def _read_data():
 
     '''
     data = {}
-    with open_csv(external_path('unemployment09.csv')) as f:
-        reader = csv.reader(f, delimiter=str(','), quotechar=str('"'))
+    with open_csv(external_path("unemployment09.csv")) as f:
+        reader = csv.reader(f, delimiter=",", quotechar='"')
         for row in reader:
             dummy, state_id, county_id, dumm, dummy, dummy, dummy, dummy, rate = row
             data[(int(state_id), int(county_id))] = float(rate)

@@ -1,15 +1,16 @@
-from __future__ import absolute_import, print_function
+from calendar import Calendar
+from calendar import day_abbr as day_abbrs
+from calendar import month_name as month_names
 
-from calendar import Calendar, day_abbr as day_abbrs, month_name as month_names
-
-from bokeh.layouts import gridplot
-from bokeh.models import Plot, ColumnDataSource, FactorRange, CategoricalAxis, HoverTool, CategoricalScale
-from bokeh.models.glyphs import Text, Rect
 from bokeh.document import Document
 from bokeh.embed import file_html
+from bokeh.layouts import gridplot
+from bokeh.models import (CategoricalAxis, CategoricalScale, ColumnDataSource,
+                          FactorRange, HoverTool, Plot, Rect, Text,)
 from bokeh.resources import INLINE
-from bokeh.util.browser import view
 from bokeh.sampledata.us_holidays import us_holidays
+from bokeh.util.browser import view
+
 
 def make_calendar(year, month, firstweekday="Mon"):
     firstweekday = list(day_abbrs).index(firstweekday)
@@ -53,7 +54,7 @@ def make_calendar(year, month, firstweekday="Mon"):
     plot = Plot(x_range=xdr, y_range=ydr, x_scale=x_scale, y_scale=y_scale,
                 plot_width=300, plot_height=300, outline_line_color=None)
     plot.title.text = month_names[month]
-    plot.title.text_font_size = "12pt"
+    plot.title.text_font_size = "16px"
     plot.title.text_color = "darkolivegreen"
     plot.title.offset = 25
     plot.min_border_left = 0
@@ -69,7 +70,7 @@ def make_calendar(year, month, firstweekday="Mon"):
     plot.add_glyph(source, text)
 
     xaxis = CategoricalAxis()
-    xaxis.major_label_text_font_size = "8pt"
+    xaxis.major_label_text_font_size = "11px"
     xaxis.major_label_standoff = 0
     xaxis.major_tick_line_color = None
     xaxis.axis_line_color = None

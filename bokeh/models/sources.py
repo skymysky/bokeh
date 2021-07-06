@@ -1,17 +1,68 @@
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import warnings
 
+# Bokeh imports
 from ..core.has_props import abstract
-from ..core.properties import Any, Bool, ColumnData, Dict, Enum, Instance, Int, JSON, List, Seq, String
+from ..core.properties import (
+    JSON,
+    Any,
+    Bool,
+    ColumnData,
+    Dict,
+    Enum,
+    Instance,
+    Int,
+    List,
+    PandasDataFrame,
+    PandasGroupBy,
+    Seq,
+    String,
+)
 from ..model import Model
 from ..util.dependencies import import_optional
+from ..util.serialization import convert_datetime_array
 from ..util.warnings import BokehUserWarning
-
-from .callbacks import Callback
+from .callbacks import CustomJS
 from .filters import Filter
+from .selections import Selection, SelectionPolicy, UnionRenderers
 
 pd = import_optional('pandas')
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'AjaxDataSource',
+    'CDSView',
+    'ColumnarDataSource',
+    'ColumnDataSource',
+    'DataSource',
+    'GeoJSONDataSource',
+    'ServerSentDataSource',
+    'WebSource',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 @abstract
 class DataSource(Model):
@@ -19,41 +70,10 @@ class DataSource(Model):
 
     '''
 
-    selected = Dict(String, Dict(String, Any), default={
-        '0d': {'glyph': None, 'indices': []},
-        '1d': {'indices': []},
-        '2d': {'indices': {}}
-    }, help="""
-    A dict to indicate selected indices on different dimensions on this DataSource. Keys are:
-
-    .. code-block:: python
-
-        # selection information for line and patch glyphs
-        '0d' : {
-          # the glyph that was selected
-          'glyph': None
-
-          # array with the [smallest] index of the segment of the line that was hit
-          'indices': []
-        }
-
-        # selection for most (point-like) glyphs, except lines and patches
-        '1d': {
-          # indices of the points included in the selection
-          indices: []
-        }
-
-        # selection information for multiline and patches glyphs
-        '2d': {
-          # mapping of indices of the multiglyph to array of glyph indices that were hit
-          # e.g. {3: [5, 6], 4: [5]}
-          indices: {}
-        }
-
-    """)
-
-    callback = Instance(Callback, help="""
-    A callback to run in the browser whenever the selection is changed.
+    selected = Instance(Selection, default=lambda: Selection(), readonly=True, help="""
+    An instance of a ``Selection`` that indicates selected indices on this ``DataSource``.
+    This is a read-only property. You may only change the attributes of this object
+    to change the selection (e.g., ``selected.indices``).
     """)
 
 @abstract
@@ -63,8 +83,8 @@ class ColumnarDataSource(DataSource):
 
     '''
 
-    column_names = List(String, help="""
-    An list of names for all the columns in this DataSource.
+    selection_policy = Instance(SelectionPolicy, default=lambda: UnionRenderers(), help="""
+    An instance of a ``SelectionPolicy`` that determines how selections are set.
     """)
 
 class ColumnDataSource(ColumnarDataSource):
@@ -73,7 +93,7 @@ class ColumnDataSource(ColumnarDataSource):
     The ``ColumnDataSource`` is a fundamental data structure of Bokeh. Most
     plots, data tables, etc. will be driven by a ``ColumnDataSource``.
 
-    If the ColumnDataSource initializer is called with a single argument that
+    If the ``ColumnDataSource`` initializer is called with a single argument that
     can be any of the following:
 
     * A Python ``dict`` that maps string names to sequences of values, e.g.
@@ -85,6 +105,11 @@ class ColumnDataSource(ColumnarDataSource):
 
           source = ColumnDataSource(data)
 
+    .. note::
+        ``ColumnDataSource`` only creates a shallow copy of ``data``. Use e.g.
+        ``ColumnDataSource(copy.deepcopy(data))`` if initializing from another
+        ``ColumnDataSource.data`` object that you want to keep independent.
+
     * A Pandas ``DataFrame`` object
 
       .. code-block:: python
@@ -92,10 +117,15 @@ class ColumnDataSource(ColumnarDataSource):
           source = ColumnDataSource(df)
 
       In this case the CDS will have columns corresponding to the columns of
-      the ``DataFrame``. If the ``DataFrame`` has a named index column, then
-      CDS will also have a column with this name. However, if the index name
-      (or any subname of a ``MultiIndex``) is ``None``, then the CDS will have
-      a column generically named ``index`` for the index.
+      the ``DataFrame``. If the ``DataFrame`` columns have multiple levels,
+      they will be flattened using an underscore (e.g. level_0_col_level_1_col).
+      The index of the ``DataFrame`` will be flattened to an ``Index`` of tuples
+      if it's a ``MultiIndex``, and then reset using ``reset_index``. The result
+      will be a column with the same name if the index was named, or
+      level_0_name_level_1_name if it was a named ``MultiIndex``. If the
+      ``Index`` did not have a name or the ``MultiIndex`` name could not be
+      flattened/determined, the ``reset_index`` function will name the index column
+      ``index``, or ``level_0`` if the name ``index`` is not available.
 
     * A Pandas ``GroupBy`` object
 
@@ -106,7 +136,7 @@ class ColumnDataSource(ColumnarDataSource):
       In this case the CDS will have columns corresponding to the result of
       calling ``group.describe()``. The ``describe`` method generates columns
       for statistical measures such as ``mean`` and ``count`` for all the
-      non-grouped orginal columns. The CDS columns are formed by joining
+      non-grouped original columns. The CDS columns are formed by joining
       original column names with the computed measure. For example, if a
       ``DataFrame`` has columns ``'year'`` and ``'mpg'``. Then passing
       ``df.groupby('year')`` to a CDS will result in columns such as
@@ -129,16 +159,24 @@ class ColumnDataSource(ColumnarDataSource):
     '''
 
     data = ColumnData(String, Seq(Any), help="""
-    Mapping of column names to sequences of data. The data can be, e.g,
+    Mapping of column names to sequences of data. The columns can be, e.g,
     Python lists or tuples, NumPy arrays, etc.
-    """).asserts(lambda _, data: len(set(len(x) for x in data.values())) <= 1,
+
+    The .data attribute can also be set from Pandas DataFrames or GroupBy
+    objects. In these cases, the behaviour is identical to passing the objects
+    to the ``ColumnDataSource`` initializer.
+    """).accepts(
+        PandasDataFrame, lambda x: ColumnDataSource._data_from_df(x)
+    ).accepts(
+        PandasGroupBy, lambda x: ColumnDataSource._data_from_groupby(x)
+    ).asserts(lambda _, data: len({len(x) for x in data.values()}) <= 1,
                  lambda obj, name, data: warnings.warn(
                     "ColumnDataSource's columns must be of the same length. " +
                     "Current lengths: %s" % ", ".join(sorted(str((k, len(v))) for k, v in data.items())), BokehUserWarning))
 
     def __init__(self, *args, **kw):
         ''' If called with a single argument that is a dict or
-        pandas.DataFrame, treat that implicitly as the "data" attribute.
+        ``pandas.DataFrame``, treat that implicitly as the "data" attribute.
 
         '''
         if len(args) == 1 and "data" not in kw:
@@ -154,13 +192,19 @@ class ColumnDataSource(ColumnarDataSource):
                 raw_data = self._data_from_groupby(raw_data)
             else:
                 raise ValueError("expected a dict or pandas.DataFrame, got %s" % raw_data)
-        super(ColumnDataSource, self).__init__(**kw)
-        self.column_names[:] = list(raw_data.keys())
+        super().__init__(**kw)
         self.data.update(raw_data)
+
+    @property
+    def column_names(self):
+        ''' A list of the column names in this data source.
+
+        '''
+        return list(self.data)
 
     @staticmethod
     def _data_from_df(df):
-        ''' Create a ``dict`` of columns from a Pandas DataFrame,
+        ''' Create a ``dict`` of columns from a Pandas ``DataFrame``,
         suitable for creating a ColumnDataSource.
 
         Args:
@@ -171,30 +215,37 @@ class ColumnDataSource(ColumnarDataSource):
 
         '''
         _df = df.copy()
-        index = _df.index
-        tmp_data = {c: v.values for c, v in _df.iteritems()}
+
+        # Flatten columns
+        if isinstance(df.columns, pd.MultiIndex):
+            try:
+                _df.columns = ['_'.join(col) for col in _df.columns.values]
+            except TypeError:
+                raise TypeError('Could not flatten MultiIndex columns. '
+                                'use string column names or flatten manually')
+        # Transform columns CategoricalIndex in list
+        if isinstance(df.columns, pd.CategoricalIndex):
+            _df.columns = df.columns.tolist()
+        # Flatten index
+        index_name = ColumnDataSource._df_index_name(df)
+        if index_name == 'index':
+            _df.index = pd.Index(_df.index.values)
+        else:
+            _df.index = pd.Index(_df.index.values, name=index_name)
+        _df.reset_index(inplace=True)
+
+        tmp_data = {c: v.values for c, v in _df.items()}
 
         new_data = {}
         for k, v in tmp_data.items():
-            if isinstance(k, tuple):
-                k = "_".join(k)
             new_data[k] = v
 
-        if index.name:
-            new_data[index.name] = index.values
-        elif index.names:
-            try:
-                new_data["_".join(index.names)] = index.values
-            except TypeError:
-                new_data["index"] = index.values
-        else:
-            new_data["index"] = index.values
         return new_data
 
     @staticmethod
     def _data_from_groupby(group):
-        ''' Create a ``dict`` of columns from a Pandas GroupBy,
-        suitable for creating a ColumnDataSource.
+        ''' Create a ``dict`` of columns from a Pandas ``GroupBy``,
+        suitable for creating a ``ColumnDataSource``.
 
         The data generated is the result of running ``describe``
         on the group.
@@ -208,10 +259,42 @@ class ColumnDataSource(ColumnarDataSource):
         '''
         return ColumnDataSource._data_from_df(group.describe())
 
+    @staticmethod
+    def _df_index_name(df):
+        ''' Return the Bokeh-appropriate column name for a ``DataFrame`` index
+
+        If there is no named index, then `"index" is returned.
+
+        If there is a single named index, then ``df.index.name`` is returned.
+
+        If there is a multi-index, and the index names are all strings, then
+        the names are joined with '_' and the result is returned, e.g. for a
+        multi-index ``['ind1', 'ind2']`` the result will be "ind1_ind2".
+        Otherwise if any index name is not a string, the fallback name "index"
+        is returned.
+
+        Args:
+            df (DataFrame) : the ``DataFrame`` to find an index name for
+
+        Returns:
+            str
+
+        '''
+        if df.index.name:
+            return df.index.name
+        elif df.index.names:
+            try:
+                return "_".join(df.index.names)
+            except TypeError:
+                return "index"
+        else:
+            return "index"
+
+
     @classmethod
     def from_df(cls, data):
-        ''' Create a ``dict`` of columns from a Pandas DataFrame,
-        suitable for creating a ColumnDataSource.
+        ''' Create a ``dict`` of columns from a Pandas ``DataFrame``,
+        suitable for creating a ``ColumnDataSource``.
 
         Args:
             data (DataFrame) : data to convert
@@ -224,8 +307,8 @@ class ColumnDataSource(ColumnarDataSource):
 
     @classmethod
     def from_groupby(cls, data):
-        ''' Create a ``dict`` of columns from a Pandas GroupBy,
-        suitable for creating a ColumnDataSource.
+        ''' Create a ``dict`` of columns from a Pandas ``GroupBy``,
+        suitable for creating a ``ColumnDataSource``.
 
         The data generated is the result of running ``describe``
         on the group.
@@ -240,11 +323,7 @@ class ColumnDataSource(ColumnarDataSource):
         return cls._data_from_df(data.describe())
 
     def to_df(self):
-        ''' Convert this data source to pandas dataframe.
-
-        If ``column_names`` is set, use those. Otherwise let Pandas
-        infer the column names. The ``column_names`` property can be
-        used both to order and filter the columns.
+        ''' Convert this data source to pandas ``DataFrame``.
 
         Returns:
             DataFrame
@@ -252,10 +331,7 @@ class ColumnDataSource(ColumnarDataSource):
         '''
         if not pd:
             raise RuntimeError('Pandas must be installed to convert to a Pandas Dataframe')
-        if self.column_names:
-            return pd.DataFrame(self.data, columns=self.column_names)
-        else:
-            return pd.DataFrame(self.data)
+        return pd.DataFrame(self.data)
 
     def add(self, data, name=None):
         ''' Appends a new column of data to the data source.
@@ -274,7 +350,6 @@ class ColumnDataSource(ColumnarDataSource):
             while "Series %d"%n in self.data:
                 n += 1
             name = "Series %d"%n
-        self.column_names.append(name)
         self.data[name] = data
         return name
 
@@ -293,10 +368,8 @@ class ColumnDataSource(ColumnarDataSource):
 
         '''
         try:
-            self.column_names.remove(name)
             del self.data[name]
         except (ValueError, KeyError):
-            import warnings
             warnings.warn("Unable to find column '%s' in data source" % name)
 
     def stream(self, new_data, rollover=None):
@@ -343,7 +416,7 @@ class ColumnDataSource(ColumnarDataSource):
 
     def _stream(self, new_data, rollover=None, setter=None):
         ''' Internal implementation to efficiently update data source columns
-        with new append-only data.   The interal implementation adds the setter
+        with new append-only data. The internal implementation adds the setter
         attribute.  [https://github.com/bokeh/bokeh/issues/6577]
 
         In cases where it is necessary to update data columns in, this method
@@ -392,13 +465,24 @@ class ColumnDataSource(ColumnarDataSource):
             source.stream(new_data)
 
         '''
+        needs_length_check = True
+
         if pd and isinstance(new_data, pd.Series):
             new_data = new_data.to_frame().T
+
         if pd and isinstance(new_data, pd.DataFrame):
-            newkeys = set(new_data.columns)
+            needs_length_check = False # DataFrame lengths equal by definition
+            _df = new_data
+            newkeys = set(_df.columns)
+            index_name = ColumnDataSource._df_index_name(_df)
+            newkeys.add(index_name)
+            new_data = dict(_df.items())
+            new_data[index_name] = _df.index.values
         else:
             newkeys = set(new_data.keys())
+
         oldkeys = set(self.data.keys())
+
         if newkeys != oldkeys:
             missing = oldkeys - newkeys
             extra = newkeys - oldkeys
@@ -411,9 +495,8 @@ class ColumnDataSource(ColumnarDataSource):
             else:
                 raise ValueError("Must stream updates to all existing columns (extra: %s)" % ", ".join(sorted(extra)))
 
-        if not (pd and isinstance(new_data, pd.DataFrame)):
-            import numpy as np
-
+        import numpy as np
+        if needs_length_check:
             lengths = set()
             arr_types = (np.ndarray, pd.Series) if pd else np.ndarray
             for k, x in new_data.items():
@@ -427,13 +510,27 @@ class ColumnDataSource(ColumnarDataSource):
             if len(lengths) > 1:
                 raise ValueError("All streaming column updates must be the same length")
 
+        # slightly awkward that we have to call convert_datetime_array here ourselves
+        # but the downstream code expects things to already be ms-since-epoch
+        for key, values in new_data.items():
+            if pd and isinstance(values, (pd.Series, pd.Index)):
+                values = values.values
+            old_values = self.data[key]
+            # Apply the transformation if the new data contains datetimes
+            # but the current data has already been transformed
+            if (isinstance(values, np.ndarray) and values.dtype.kind.lower() == 'm' and
+                isinstance(old_values, np.ndarray) and old_values.dtype.kind.lower() != 'm'):
+                new_data[key] = convert_datetime_array(values)
+            else:
+                new_data[key] = values
+
         self.data._stream(self.document, self, new_data, rollover, setter)
 
     def patch(self, patches, setter=None):
         ''' Efficiently update data source columns at specific locations
 
         If it is only necessary to update a small subset of data in a
-        ColumnDataSource, this method can be used to efficiently update only
+        ``ColumnDataSource``, this method can be used to efficiently update only
         the subset, instead of requiring the entire data set to be sent.
 
         This method should be passed a dictionary that maps column names to
@@ -520,7 +617,7 @@ class ColumnDataSource(ColumnarDataSource):
 
         .. code-block:: python
 
-            dict(foo=[11, 22, 30], bar=[101, 200, 301])
+            dict(foo=[11, 12, 30], bar=[101, 200, 301])
 
         For a more comprehensive complete example, see :bokeh-tree:`examples/howto/patch_app.py`.
 
@@ -586,16 +683,8 @@ class ColumnDataSource(ColumnarDataSource):
 
         self.data._patch(self.document, self, patches, setter)
 
-def _check_slice(s):
-    if (s.start is not None and s.stop is not None and s.start > s.stop):
-        raise ValueError("Patch slices must have start < end, got %s" % s)
-    if (s.start is not None and s.start < 1) or \
-       (s.stop  is not None and s.stop < 1) or \
-       (s.step  is not None and s.step < 1):
-        raise ValueError("Patch slices must have positive (start, stop, step) values, got %s" % s)
-
 class CDSView(Model):
-    ''' A view into a ColumnDataSource that represents a row-wise subset.
+    ''' A view into a ``ColumnDataSource`` that represents a row-wise subset.
 
     '''
 
@@ -604,7 +693,7 @@ class CDSView(Model):
     """)
 
     source = Instance(ColumnarDataSource, help="""
-    The ColumnDataSource associated with this view. Used to determine
+    The ``ColumnDataSource`` associated with this view. Used to determine
     the length of the columns.
     """)
 
@@ -614,43 +703,94 @@ class GeoJSONDataSource(ColumnarDataSource):
     '''
 
     geojson = JSON(help="""
-    GeoJSON that contains features for plotting. Currently GeoJSONDataSource can
-    only process a FeatureCollection or GeometryCollection.
+    GeoJSON that contains features for plotting. Currently
+    ``GeoJSONDataSource`` can only process a ``FeatureCollection`` or
+    ``GeometryCollection``.
     """)
 
 @abstract
-class RemoteSource(ColumnDataSource):
-    '''
+class WebSource(ColumnDataSource):
+    ''' Base class for web column data sources that can update from data
+    URLs.
+
+    .. note::
+        This base class is typically not useful to instantiate on its own.
 
     '''
 
-    data_url = String(help="""
-    The URL to the endpoint for the data.
-    """)
+    adapter = Instance(CustomJS, help="""
+    A JavaScript callback to adapt raw JSON responses to Bokeh ``ColumnDataSource``
+    format.
 
-    polling_interval = Int(help="""
-    polling interval for updating data source in milliseconds
-    """)
-
-class AjaxDataSource(RemoteSource):
-    '''
-
-    '''
-
-    method = Enum('POST', 'GET', help="http method - GET or POST")
-
-    mode = Enum("replace", "append", help="""
-    Whether to append new data to existing data (up to ``max_size``),
-    or to replace existing data entirely.
+    If provided, this callback is executes immediately after the JSON data is
+    received, but before appending or replacing data in the data source. The
+    ``CustomJS`` callback will receive the ``AjaxDataSource`` as ``cb_obj`` and
+    will receive the raw JSON response as ``cb_data.response``. The callback
+    code should return a ``data`` object suitable for a Bokeh ``ColumnDataSource``
+    (i.e.  a mapping of string column names to arrays of data).
     """)
 
     max_size = Int(help="""
-    Maximum size of the data array being kept after each pull requests.
-    Larger than that size, the data will be right shifted.
+    Maximum size of the data columns. If a new fetch would result in columns
+    larger than ``max_size``, then earlier data is dropped to make room.
+    """)
+
+    mode = Enum("replace", "append", help="""
+    Whether to append new data to existing data (up to ``max_size``), or to
+    replace existing data entirely.
+    """)
+
+    data_url = String(help="""
+    A URL to to fetch data from.
+    """)
+
+class ServerSentDataSource(WebSource):
+    ''' A data source that can populate columns by receiving server sent
+    events endpoints.
+
+    '''
+
+class AjaxDataSource(WebSource):
+    ''' A data source that can populate columns by making Ajax calls to REST
+    endpoints.
+
+    The ``AjaxDataSource`` can be especially useful if you want to make a
+    standalone document (i.e. not backed by the Bokeh server) that can still
+    dynamically update using an existing REST API.
+
+    The response from the REST API should match the ``.data`` property of a
+    standard ``ColumnDataSource``, i.e. a JSON dict that maps names to arrays
+    of values:
+
+    .. code-block:: python
+
+        {
+            'x' : [1, 2, 3, ...],
+            'y' : [9, 3, 2, ...]
+        }
+
+    Alternatively, if the REST API returns a different format, a ``CustomJS``
+    callback can be provided to convert the REST response into Bokeh format,
+    via the ``adapter`` property of this data source.
+
+    Initial data can be set by specifying the ``data`` property directly.
+    This is necessary when used in conjunction with a ``FactorRange``, even
+    if the columns in `data`` are empty.
+
+    A full example can be seen at :bokeh-tree:`examples/howto/ajax_source.py`
+
+    '''
+
+    polling_interval = Int(help="""
+    A polling interval (in milliseconds) for updating data source.
+    """)
+
+    method = Enum('POST', 'GET', help="""
+    Specify the HTTP method to use for the Ajax request (GET or POST)
     """)
 
     if_modified = Bool(False, help="""
-    Whether to include an ``If-Modified-Since`` header in AJAX requests
+    Whether to include an ``If-Modified-Since`` header in Ajax requests
     to the server. If this header is supported by the server, then only
     new data since the last request will be returned.
     """)
@@ -660,5 +800,32 @@ class AjaxDataSource(RemoteSource):
     """)
 
     http_headers = Dict(String, String, help="""
-    HTTP headers to set for the Ajax request.
+    Specify HTTP headers to set for the Ajax request.
+
+    Example:
+
+    .. code-block:: python
+
+        ajax_source.headers = { 'x-my-custom-header': 'some value' }
+
     """)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+def _check_slice(s):
+    if (s.start is not None and s.stop is not None and s.start > s.stop):
+        raise ValueError("Patch slices must have start < end, got %s" % s)
+    if (s.start is not None and s.start < 0) or \
+       (s.stop  is not None and s.stop < 0) or \
+       (s.step  is not None and s.step < 0):
+        raise ValueError("Patch slices must have non-negative (start, stop, step) values, got %s" % s)
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

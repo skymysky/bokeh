@@ -2,10 +2,10 @@ from os.path import dirname, join
 
 import pandas as pd
 
-from bokeh.layouts import row, widgetbox
-from bokeh.models import ColumnDataSource, CustomJS
-from bokeh.models.widgets import RangeSlider, Button, DataTable, TableColumn, NumberFormatter
 from bokeh.io import curdoc
+from bokeh.layouts import column, row
+from bokeh.models import (Button, ColumnDataSource, CustomJS, DataTable,
+                          NumberFormatter, RangeSlider, TableColumn,)
 
 df = pd.read_csv(join(dirname(__file__), 'salary_data.csv'))
 
@@ -23,8 +23,8 @@ slider = RangeSlider(title="Max Salary", start=10000, end=110000, value=(10000, 
 slider.on_change('value', lambda attr, old, new: update())
 
 button = Button(label="Download", button_type="success")
-button.callback = CustomJS(args=dict(source=source),
-                           code=open(join(dirname(__file__), "download.js")).read())
+button.js_on_click(CustomJS(args=dict(source=source),
+                            code=open(join(dirname(__file__), "download.js")).read()))
 
 columns = [
     TableColumn(field="name", title="Employee Name"),
@@ -34,10 +34,9 @@ columns = [
 
 data_table = DataTable(source=source, columns=columns, width=800)
 
-controls = widgetbox(slider, button)
-table = widgetbox(data_table)
+controls = column(slider, button)
 
-curdoc().add_root(row(controls, table))
+curdoc().add_root(row(controls, data_table))
 curdoc().title = "Export CSV"
 
 update()

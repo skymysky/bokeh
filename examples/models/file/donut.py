@@ -1,16 +1,14 @@
-from __future__ import print_function
-
 import base64
-from math import pi, sin, cos
+from math import cos, pi, sin
 
-from bokeh.util.browser import view
-from bokeh.colors.named import skyblue, seagreen, tomato, orchid, firebrick, lightgray
+from bokeh.colors.named import firebrick, lightgray, orchid, seagreen, skyblue, tomato
 from bokeh.document import Document
 from bokeh.embed import file_html
-from bokeh.models.glyphs import Wedge, AnnularWedge, ImageURL, Text
-from bokeh.models import ColumnDataSource, Plot, Range1d
+from bokeh.models import (AnnularWedge, ColumnDataSource,
+                          ImageURL, Plot, Range1d, Text, Wedge,)
 from bokeh.resources import INLINE
 from bokeh.sampledata.browsers import browsers_nov_2013, icons
+from bokeh.util.browser import view
 
 df = browsers_nov_2013
 
@@ -61,7 +59,7 @@ for browser, start_angle, end_angle in zip(browsers, start_angles, end_angles):
     end = angles.tolist() + [end_angle]
     start = [start_angle] + end[:-1]
     base_color = colors[browser]
-    fill = [ base_color.lighten(i*0.05) for i in range(len(versions) + 1) ]
+    fill = [ base_color.lighten(i*0.05).to_hex() for i in range(len(versions) + 1) ]
     # extra empty string accounts for all versions with share < 0.5 together
     text = [ number if share >= 1 else "" for number, share in zip(versions.VersionNumber, versions.Share) ] + [""]
     x, y = polar_to_cartesian(1.25, start, end)
@@ -72,23 +70,12 @@ for browser, start_angle, end_angle in zip(browsers, start_angles, end_angles):
         line_color="white", line_width=2, fill_color="fill")
     plot.add_glyph(source, glyph)
 
-
     text_angle = [(start[i]+end[i])/2 for i in range(len(start))]
     text_angle = [angle + pi if pi/2 < angle < 3*pi/2 else angle for angle in text_angle]
 
-    if first and text:
-        text.insert(0, '(version)')
-        offset = pi / 48
-        text_angle.insert(0, text_angle[0] - offset)
-        start.insert(0, start[0] - offset)
-        end.insert(0, end[0] - offset)
-        x, y = polar_to_cartesian(1.25, start, end)
-        first = False
-
-
     text_source = ColumnDataSource(dict(text=text, x=x, y=y, angle=text_angle))
     glyph = Text(x="x", y="y", text="text", angle="angle",
-        text_align="center", text_baseline="middle", text_font_size="8pt")
+        text_align="center", text_baseline="middle", text_font_size="11px")
     plot.add_glyph(text_source, glyph)
 
 

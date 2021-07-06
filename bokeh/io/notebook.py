@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,12 +11,8 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -25,14 +20,12 @@ from bokeh.util.api import public, internal ; public, internal
 
 # Standard library imports
 import json
-from warnings import warn
 from uuid import uuid4
-
-# External imports
+from warnings import warn
 
 # Bokeh imports
-from .state import curstate
 from ..util.serialization import make_id
+from .state import curstate
 
 #-----------------------------------------------------------------------------
 # Globals and constants
@@ -46,12 +39,25 @@ LOAD_MIME_TYPE = 'application/vnd.bokehjs_load.v0+json'
 
 EXEC_MIME_TYPE = 'application/vnd.bokehjs_exec.v0+json'
 
+__all__ = (
+    'CommsHandle',
+    'destroy_server',
+    'get_comms',
+    'install_notebook_hook',
+    'install_jupyter_hooks',
+    'load_notebook',
+    'publish_display_data',
+    'push_notebook',
+    'run_notebook_hook',
+    'show_app',
+    'show_doc',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-class CommsHandle(object):
+class CommsHandle:
     '''
 
     '''
@@ -83,12 +89,10 @@ class CommsHandle(object):
             return "<p><code>&lt;Bokeh Notebook handle&gt;</code></p>"
 
     @property
-    @internal((1,0,0))
     def comms(self):
         return self._comms
 
     @property
-    @internal((1,0,0))
     def doc(self):
         return self._doc
 
@@ -98,10 +102,9 @@ class CommsHandle(object):
     # internal doc with the event so that it is collected (until a
     # call to push_notebook processes and clear colleted events)
     def _document_model_changed(self, event):
-        if event.model._id in self.doc._all_models:
+        if event.model.id in self.doc._all_models:
             self.doc._trigger_on_change(event)
 
-@public((1,0,0))
 def install_notebook_hook(notebook_type, load, show_doc, show_app, overwrite=False):
     ''' Install a new notebook display hook.
 
@@ -159,9 +162,10 @@ def install_notebook_hook(notebook_type, load, show_doc, show_app, overwrite=Fal
             .. code-block:: python
 
                 show_app(
-                    app,         # the Bokeh Application to display
-                    state,       # current bokeh.io "state"
-                    notebook_url # URL to the current active notebook page
+                    app,          # the Bokeh Application to display
+                    state,        # current bokeh.io "state"
+                    notebook_url, # URL to the current active notebook page
+                    **kw          # any backend-specific keywords passed as-is
                 )
 
         overwrite (bool, optional) :
@@ -180,8 +184,7 @@ def install_notebook_hook(notebook_type, load, show_doc, show_app, overwrite=Fal
         raise RuntimeError("hook for notebook type %r already exists" % notebook_type)
     _HOOKS[notebook_type] = dict(load=load, doc=show_doc, app=show_app)
 
-@public((1,0,0))
-def push_notebook(document=None, state=None, handle=None):
+def push_notebook(*, document=None, state=None, handle=None):
     ''' Update Bokeh plots in a Jupyter notebook output cells with new data
     or property values.
 
@@ -250,8 +253,15 @@ def push_notebook(document=None, state=None, handle=None):
         return
 
     events = list(handle.doc._held_events)
+
+    # This is to avoid having an exception raised for attempting to create a
+    # PATCH-DOC with no events. In the notebook, we just want to silently
+    # ignore calls to push_notebook when there are no new events
+    if len(events) == 0:
+        return
+
     handle.doc._held_events = []
-    msg = Protocol("1.0").create("PATCH-DOC", events)
+    msg = Protocol().create("PATCH-DOC", events)
 
     handle.comms.send(msg.header_json)
     handle.comms.send(msg.metadata_json)
@@ -260,7 +270,6 @@ def push_notebook(document=None, state=None, handle=None):
         handle.comms.send(json.dumps(header))
         handle.comms.send(buffers=[payload])
 
-@public((1,0,0))
 def run_notebook_hook(notebook_type, action, *args, **kw):
     ''' Run an installed notebook hook with supplied arguments.
 
@@ -278,7 +287,7 @@ def run_notebook_hook(notebook_type, action, *args, **kw):
         Result of the hook action, as-is
 
     Raises:
-        RunetimeError
+        RuntimeError
             If the hook or specific action is not installed
 
     '''
@@ -289,10 +298,9 @@ def run_notebook_hook(notebook_type, action, *args, **kw):
     return _HOOKS[notebook_type][action](*args, **kw)
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
-@internal((1,0,0))
 def destroy_server(server_id):
     ''' Given a UUID id of a div removed or replaced in the Jupyter
     notebook, destroy the corresponding server sessions and stop it.
@@ -312,7 +320,6 @@ def destroy_server(server_id):
     except Exception as e:
         log.debug("Could not destroy server for id %r: %s" % (server_id, e))
 
-@internal((1,0,0))
 def get_comms(target_name):
     ''' Create a Jupyter comms object for a specific target, that can
     be used to update Bokeh documents in the Jupyter notebook.
@@ -328,14 +335,12 @@ def get_comms(target_name):
     from ipykernel.comm import Comm
     return Comm(target_name=target_name, data={})
 
-@internal((1,0,0))
 def install_jupyter_hooks():
     '''
 
     '''
     install_notebook_hook('jupyter', load_notebook, show_doc, show_app)
 
-@internal((1,0,0))
 def load_notebook(resources=None, verbose=False, hide_banner=False, load_timeout=5000):
     ''' Prepare the IPython notebook for displaying Bokeh plots.
 
@@ -365,15 +370,15 @@ def load_notebook(resources=None, verbose=False, hide_banner=False, load_timeout
 
     from .. import __version__
     from ..core.templates import NOTEBOOK_LOAD
+    from ..resources import Resources
+    from ..settings import settings
     from ..util.serialization import make_id
-    from ..resources import CDN
-    from ..util.compiler import bundle_all_models
+    from ..embed.bundle import bundle_for_objs_and_resources
 
     if resources is None:
-        resources = CDN
+        resources = Resources(mode=settings.resources())
 
     if not hide_banner:
-
         if resources.mode == 'inline':
             js_info = 'inline'
             css_info = 'inline'
@@ -401,19 +406,18 @@ def load_notebook(resources=None, verbose=False, hide_banner=False, load_timeout
 
     _NOTEBOOK_LOADED = resources
 
-    custom_models_js = bundle_all_models()
+    bundle = bundle_for_objs_and_resources(None, resources)
 
-    nb_js = _loading_js(resources, element_id, custom_models_js, load_timeout, register_mime=True)
-    jl_js = _loading_js(resources, element_id, custom_models_js, load_timeout, register_mime=False)
+    nb_js = _loading_js(bundle, element_id, load_timeout, register_mime=True)
+    jl_js = _loading_js(bundle, element_id, load_timeout, register_mime=False)
 
     if not hide_banner:
         publish_display_data({'text/html': html})
     publish_display_data({
         JS_MIME_TYPE   : nb_js,
-        LOAD_MIME_TYPE : jl_js
+        LOAD_MIME_TYPE : jl_js,
     })
 
-@internal((1,0,0))
 def publish_display_data(*args, **kw):
     '''
 
@@ -422,9 +426,37 @@ def publish_display_data(*args, **kw):
     from IPython.display import publish_display_data
     return publish_display_data(*args, **kw)
 
-@internal((1,0,0))
-def show_app(app, state, notebook_url):
-    '''
+def show_app(app, state, notebook_url, port=0, **kw):
+    ''' Embed a Bokeh server application in a Jupyter Notebook output cell.
+
+    Args:
+        app (Application or callable) :
+            A Bokeh Application to embed inline in a Jupyter notebook.
+
+        state (State) :
+            ** Unused **
+
+        notebook_url (str or callable) :
+            The URL of the notebook server that is running the embedded app.
+
+            If ``notebook_url`` is a string, the value string is parsed to
+            construct the origin and full server URLs.
+
+            If notebook_url is a callable, it must accept one parameter,
+            which will be the server port, or None. If passed a port,
+            the callable must generate the server URL, otherwise if passed
+            None, it must generate the origin URL for the server.
+
+        port (int) :
+            A port for the embedded server will listen on.
+
+            By default the port is 0, which results in the server listening
+            on a random dynamic port.
+
+    Any additional keyword arguments are passed to :class:`~bokeh.server.Server` (added in version 1.1)
+
+    Returns:
+        None
 
     '''
     logging.basicConfig()
@@ -433,16 +465,29 @@ def show_app(app, state, notebook_url):
     from ..server.server import Server
 
     loop = IOLoop.current()
-    server = Server({"/": app}, io_loop=loop, port=0,  allow_websocket_origin=[notebook_url])
+
+    if callable(notebook_url):
+        origin = notebook_url(None)
+    else:
+        origin = _origin_url(notebook_url)
+
+    server = Server({"/": app}, io_loop=loop, port=port,  allow_websocket_origin=[origin], **kw)
 
     server_id = uuid4().hex
     curstate().uuid_to_server[server_id] = server
 
     server.start()
-    url = 'http://%s:%d%s' % (notebook_url.split(':')[0], server.port, "/")
+
+    if callable(notebook_url):
+        url = notebook_url(server.port)
+    else:
+        url = _server_url(notebook_url, server.port)
+
+    logging.debug("Server URL is %s" % url)
+    logging.debug("Origin URL is %s" % origin)
 
     from ..embed import server_document
-    script = server_document(url)
+    script = server_document(url, resources=None)
 
     publish_display_data({
         HTML_MIME_TYPE: script,
@@ -451,17 +496,19 @@ def show_app(app, state, notebook_url):
         EXEC_MIME_TYPE: {"server_id": server_id}
     })
 
-@internal((1,0,0))
 def show_doc(obj, state, notebook_handle):
     '''
 
     '''
-    from ..embed import notebook_content
+    if obj not in state.document.roots:
+        state.document.add_root(obj)
+
+    from ..embed.notebook import notebook_content
     comms_target = make_id() if notebook_handle else None
     (script, div, cell_doc) = notebook_content(obj, comms_target)
 
     publish_display_data({HTML_MIME_TYPE: div})
-    publish_display_data({JS_MIME_TYPE: script, EXEC_MIME_TYPE: ""}, metadata={EXEC_MIME_TYPE: {"id": obj._id}})
+    publish_display_data({JS_MIME_TYPE: script, EXEC_MIME_TYPE: ""}, metadata={EXEC_MIME_TYPE: {"id": obj.id}})
 
     # Comms handling relies on the fact that the cell_doc returned by
     # notebook copy has models with the same IDs as the original curdoc
@@ -480,19 +527,36 @@ _HOOKS = {}
 
 _NOTEBOOK_LOADED = None
 
-def _loading_js(resources, element_id, custom_models_js, load_timeout=5000, register_mime=True):
+def _loading_js(bundle, element_id, load_timeout=5000, register_mime=True):
+    '''
+
+    '''
     from ..core.templates import AUTOLOAD_NB_JS
 
     return AUTOLOAD_NB_JS.render(
+        bundle    = bundle,
         elementid = element_id,
-        js_urls   = resources.js_files,
-        css_urls  = resources.css_files,
-        js_raw    = resources.js_raw + [custom_models_js],
-        css_raw   = resources.css_raw_str,
         force     = True,
         timeout   = load_timeout,
         register_mime = register_mime
     )
+
+def _origin_url(url):
+    '''
+
+    '''
+    if url.startswith("http"):
+        url = url.split("//")[1]
+    return url
+
+def _server_url(url, port):
+    '''
+
+    '''
+    if url.startswith("http"):
+        return '%s:%d%s' % (url.rsplit(':', 1)[0], port, "/")
+    else:
+        return 'http://%s:%d%s' % (url.split(':')[0], port, "/")
 
 #-----------------------------------------------------------------------------
 # Code

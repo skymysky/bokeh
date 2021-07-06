@@ -4,8 +4,8 @@
 
 import numpy as np
 
-from bokeh.models import TapTool, CustomJS, ColumnDataSource
-from bokeh.plotting import output_file, show, figure
+from bokeh.models import ColumnDataSource, CustomJS, TapTool
+from bokeh.plotting import figure, output_file, show
 
 # The data is setup to have very different scales in x and y, to verify
 # that picking happens in pixels. Different widths are used to test that
@@ -16,10 +16,11 @@ from bokeh.plotting import output_file, show, figure
 t = np.linspace(0, 0.1, 100)
 
 code = """
-d0 = cb_obj.selected["0d"];
-if (d0.glyph) {
-    var color = d0.get_view().visuals.line.line_color.value();
-    var data = source.data;
+// cb_data = {geometries: ..., source: ...}
+const view = cb_data.source.selected.get_view();
+const data = source.data;
+if (view) {
+    const color = view.model.line_color;
     data['text'] = ['Selected the ' + color + ' line'];
     data['text_color'] = [color];
     source.change.emit();

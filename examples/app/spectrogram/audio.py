@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from time import sleep
 
 import numpy as np
@@ -40,7 +38,7 @@ try:
             except:
                 continue
 
-except:
+except ImportError:
     print()
     print(" *** Pyaudio package not installed, using synthesized audio data ***")
     print()

@@ -38,11 +38,8 @@ const tools = "pan,crosshair,wheel_zoom,box_zoom,reset,hover,save"
 
 const p = plt.figure({title: "Hoverful Scatter", tools: tools})
 
-const circles = p.circle({field: "x"}, {field: "y"}, {source: source, radius: radii,
-                         fill_color: colors, fill_alpha: 0.6, line_color: null})
-
 p.text({field: "x"}, {field: "y"}, indices, {source: source, alpha: 0.5,
-       text_font_size: "5pt", text_baseline: "middle", text_align: "center"})
+       text_font_size: "7px", text_baseline: "middle", text_align: "center"})
 
 const hover = p.toolbar.select_one(Bokeh.HoverTool)
 hover.tooltips = (source, info) => {

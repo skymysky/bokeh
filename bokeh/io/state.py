@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -17,7 +16,7 @@ Generating output for Bokeh plots requires coordinating several things:
 
 :class:`~bokeh.document.Document`
     Groups together Bokeh models that may be shared between plots (e.g.,
-    range or data source objects) into one common strucure.
+    range or data source objects) into one common structure.
 
 :class:`~bokeh.resources.Resources`
     Control how JavaScript and CSS for the client library BokehJS are
@@ -35,12 +34,8 @@ ensures their proper configuration in many common usage scenarios.
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -48,9 +43,6 @@ from bokeh.util.api import public, internal ; public, internal
 
 # Standard library imports
 import os
-
-# External imports
-from six import string_types
 
 # Bokeh imports
 from ..document import Document
@@ -60,12 +52,16 @@ from ..resources import Resources
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'curstate',
+    'State',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-class State(object):
+class State:
     ''' Manage state related to controlling Bokeh output.
 
     '''
@@ -77,7 +73,6 @@ class State(object):
     # Properties --------------------------------------------------------------
 
     @property
-    @public((1,0,0))
     def document(self):
         ''' A default :class:`~bokeh.document.Document` to use for all
         output operations.
@@ -86,12 +81,10 @@ class State(object):
         return self._document
 
     @document.setter
-    @public((1,0,0))
     def document(self, doc):
         self._document = doc
 
     @property
-    @public((1,0,0))
     def file(self):
         ''' A dict with the default configuration for file output (READ ONLY)
 
@@ -109,7 +102,6 @@ class State(object):
         return self._file
 
     @property
-    @public((1,0,0))
     def notebook(self):
         ''' Whether to generate notebook output on show operations. (READ ONLY)
 
@@ -117,7 +109,6 @@ class State(object):
         return self._notebook
 
     @property
-    @public((1,0,0))
     def notebook_type(self):
         ''' Notebook type
 
@@ -125,20 +116,18 @@ class State(object):
         return self._notebook_type
 
     @notebook_type.setter
-    @public((1,0,0))
     def notebook_type(self, notebook_type):
         ''' Notebook type, acceptable values are 'jupyter' as well as any names
         defined by external notebook hooks that have been installed.
 
         '''
-        if notebook_type is None or not isinstance(notebook_type, string_types):
+        if notebook_type is None or not isinstance(notebook_type, str):
             raise ValueError("Notebook type must be a string")
         self._notebook_type = notebook_type.lower()
 
     # Public methods ----------------------------------------------------------
 
-    @public((1,0,0))
-    def output_file(self, filename, title="Bokeh Plot", mode="cdn", root_dir=None):
+    def output_file(self, filename, title="Bokeh Plot", mode=None, root_dir=None):
         ''' Configure output to a standalone HTML file.
 
         Calling ``output_file`` not clear the effects of any other calls to
@@ -160,7 +149,7 @@ class State(object):
             root_dir (str, optional) : root dir to use for absolute resources
                 (default: None)
 
-                This value is ignored for other resource types, e.g. ``INLINE`` or``CDN``.
+                This value is ignored for other resource types, e.g. ``INLINE`` or ``CDN``.
 
         .. warning::
             The specified output file will be overwritten on every save, e.g.,
@@ -176,7 +165,6 @@ class State(object):
         if os.path.isfile(filename):
             log.info("Session output file '%s' already exists, will be overwritten." % filename)
 
-    @public((1,0,0))
     def output_notebook(self, notebook_type='jupyter'):
         ''' Generate output in notebook cells.
 
@@ -192,7 +180,6 @@ class State(object):
         self._notebook = True
         self.notebook_type = notebook_type
 
-    @public((1,0,0))
     def reset(self):
         ''' Deactivate all currently active output modes and set ``curdoc()``
         to a fresh empty ``Document``.
@@ -223,7 +210,6 @@ class State(object):
         self._document = doc
         self._reset_keeping_doc()
 
-@public((1,0,0))
 def curstate():
     ''' Return the current State object
 
@@ -235,6 +221,10 @@ def curstate():
     if _STATE is None:
         _STATE = State()
     return _STATE
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Private API

@@ -1,30 +1,71 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Models for describing different kinds of ranges of values
 in different kinds of spaces (e.g., continuous or categorical)
 and with options for "auto sizing".
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+from collections import Counter
+
+# Bokeh imports
 from ..core.enums import PaddingUnits, StartEnd
 from ..core.has_props import abstract
-from ..core.properties import (Bool, Datetime, Either, Enum, Float, Instance, Int,
-                               List, MinMaxBounds, Seq, String, TimeDelta, Tuple)
+from ..core.properties import (
+    Bool,
+    Datetime,
+    Either,
+    Enum,
+    Float,
+    Instance,
+    List,
+    MinMaxBounds,
+    Seq,
+    String,
+    TimeDelta,
+    Tuple,
+)
+from ..core.validation import error
+from ..core.validation.errors import DUPLICATE_FACTORS
 from ..model import Model
-
-from .callbacks import Callback
 from .renderers import Renderer
 
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'DataRange',
+    'DataRange1d',
+    'FactorRange',
+    'Range',
+    'Range1d',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 @abstract
 class Range(Model):
     ''' A base class for all range types.
 
     '''
-
-    callback = Instance(Callback, help="""
-    A callback to run in the browser whenever the range is updated.
-    """)
-
 
 class Range1d(Range):
     ''' A fixed, closed range [start, end] in a continuous scalar
@@ -38,12 +79,22 @@ class Range1d(Range):
 
     '''
 
-    start = Either(Float, Datetime, Int, default=0, help="""
+    start = Either(Float, Datetime, TimeDelta, default=0, help="""
     The start of the range.
     """)
 
-    end = Either(Float, Datetime, Int, default=1, help="""
+    end = Either(Float, Datetime, TimeDelta, default=1, help="""
     The end of the range.
+    """)
+
+    reset_start = Either(Float, Datetime, TimeDelta, default=None, help="""
+    The start of the range to apply after reset. If set to ``None`` defaults
+    to the ``start`` value during initialization.
+    """)
+
+    reset_end = Either(Float, Datetime, TimeDelta, default=None, help="""
+    The end of the range to apply when resetting. If set to ``None`` defaults
+    to the ``end`` value during initialization.
     """)
 
     bounds = MinMaxBounds(accept_datetime=True, default=None, help="""
@@ -61,18 +112,21 @@ class Range1d(Range):
 
     Examples:
 
+    .. code-block:: python
+
         Range1d(0, 1, bounds='auto')  # Auto-bounded to 0 and 1 (Default behavior)
         Range1d(start=0, end=1, bounds=(0, None))  # Maximum is unbounded, minimum bounded to 0
+
     """)
 
-    min_interval = Either(Float, TimeDelta, Int, default=None, help="""
+    min_interval = Either(Float, TimeDelta, default=None, help="""
     The level that the range is allowed to zoom in, expressed as the
     minimum visible interval. If set to ``None`` (default), the minimum
-    interval is not bound. Can be a timedelta. """)
+    interval is not bound. Can be a ``TimeDelta``. """)
 
-    max_interval = Either(Float, TimeDelta, Int, default=None, help="""
+    max_interval = Either(Float, TimeDelta, default=None, help="""
     The level that the range is allowed to zoom out, expressed as the
-    maximum visible interval. Can be a timedelta. Note that ``bounds`` can
+    maximum visible interval. Can be a ``TimeDelta``. Note that ``bounds`` can
     impose an implicit constraint on the maximum interval as well. """)
 
     def __init__(self, *args, **kwargs):
@@ -85,7 +139,7 @@ class Range1d(Range):
             kwargs['start'] = args[0]
             kwargs['end'] = args[1]
 
-        super(Range1d, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
 @abstract
@@ -108,11 +162,13 @@ class DataRange(Range):
 
 class DataRange1d(DataRange):
     ''' An auto-fitting range in a continuous scalar dimension.
-    The upper and lower bounds are set to the min and max of the data.
+
+    By default the ``start`` and ``end`` of the range automatically
+    assume min and max values of the data for associated renderers.
 
     '''
 
-    range_padding = Float(default=0.1, help="""
+    range_padding = Either(Float, TimeDelta, default=0.1, help="""
     How much padding to add around the computed data bounds.
 
     When ``range_padding_units`` is set to ``"percent"``, the span of the
@@ -127,23 +183,23 @@ class DataRange1d(DataRange):
     as an absolute quantity. (default: ``"percent"``)
     """)
 
-    start = Float(help="""
+    start = Either(Float, Datetime, TimeDelta, help="""
     An explicitly supplied range start. If provided, will override
     automatically computed start value.
     """)
 
-    end = Float(help="""
+    end = Either(Float, Datetime, TimeDelta, help="""
     An explicitly supplied range end. If provided, will override
     automatically computed end value.
     """)
 
-    bounds = MinMaxBounds(accept_datetime=False, default=None, help="""
+    bounds = MinMaxBounds(accept_datetime=True, default=None, help="""
     The bounds that the range is allowed to go to. Typically used to prevent
     the user from panning/zooming/etc away from the data.
 
     By default, the bounds will be None, allowing your plot to pan/zoom as far
     as you want. If bounds are 'auto' they will be computed to be the same as
-    the start and end of the DataRange1d.
+    the start and end of the ``DataRange1d``.
 
     Bounds are provided as a tuple of ``(min, max)`` so regardless of whether
     your range is increasing or decreasing, the first item should be the
@@ -154,12 +210,12 @@ class DataRange1d(DataRange):
     ``max`` to ``None`` e.g. ``DataRange1d(bounds=(None, 12))``
     """)
 
-    min_interval = Float(default=None, help="""
+    min_interval = Either(Float, TimeDelta, default=None, help="""
     The level that the range is allowed to zoom in, expressed as the
     minimum visible interval. If set to ``None`` (default), the minimum
     interval is not bound.""")
 
-    max_interval = Float(default=None, help="""
+    max_interval = Either(Float, TimeDelta, default=None, help="""
     The level that the range is allowed to zoom out, expressed as the
     maximum visible interval. Note that ``bounds`` can impose an
     implicit constraint on the maximum interval as well.""")
@@ -188,7 +244,7 @@ class DataRange1d(DataRange):
     ``None``.
     """)
 
-    follow_interval = Float(default=None, help="""
+    follow_interval = Either(Float, TimeDelta, default=None, help="""
     If ``follow`` is set to ``"start"`` or ``"end"`` then the range will
     always be constrained to that::
 
@@ -198,15 +254,20 @@ class DataRange1d(DataRange):
 
     """)
 
-    default_span = Float(default=2.0, help="""
+    default_span = Either(Float, TimeDelta, default=2.0, help="""
     A default width for the interval, in case ``start`` is equal to ``end``
     (if used with a log axis, default_span is in powers of 10).
+    """)
+
+    only_visible = Bool(default=False, help="""
+    If True, renderers that that are not visible will be excluded from automatic
+    bounds computations.
     """)
 
     def __init__(self, *args, **kwargs):
         if kwargs.get('follow') is not None:
             kwargs['bounds'] = None
-        super(DataRange1d, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
 class FactorRange(Range):
@@ -254,7 +315,7 @@ class FactorRange(Range):
     Factors may have 1, 2, or 3 levels. For 1-level factors, each factor is
     simply a string. For example:
 
-    .. code-block: python
+    .. code-block:: python
 
         FactorRange(factors=["sales", "marketing", "engineering"])
 
@@ -311,7 +372,7 @@ class FactorRange(Range):
         FactorRange(factors=[["foo", "1'], ["foo", "2'], ["bar", "1"]])
 
     The top level groups correspond to ``"foo"` and ``"bar"``, and the
-    group padding will be applied between the factors``["foo", "2']`` and
+    group padding will be applied between the factors ``["foo", "2']`` and
     ``["bar", "1"]``
     """)
 
@@ -334,7 +395,7 @@ class FactorRange(Range):
     The start of the range, in synthetic coordinates.
 
         Synthetic coordinates are only computed in the browser, based on the
-        factors and various padding properties. The value of ``end`` will only
+        factors and various padding properties. The value of ``start`` will only
         be available in situations where bidirectional communication is
         available (e.g. server, notebook).
     """)
@@ -361,7 +422,7 @@ class FactorRange(Range):
 
     By default, the bounds will be None, allowing your plot to pan/zoom as far
     as you want. If bounds are 'auto' they will be computed to be the same as
-    the start and end of the FactorRange.
+    the start and end of the ``FactorRange``.
     """)
 
     min_interval = Float(default=None, help="""
@@ -389,4 +450,22 @@ class FactorRange(Range):
             raise ValueError("'factors' keyword cannot be used with positional arguments")
         elif args:
             kwargs['factors'] = list(args)
-        super(FactorRange, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+
+    @error(DUPLICATE_FACTORS)
+    def _check_duplicate_factors(self):
+        dupes = [item for item, count in Counter(self.factors).items() if count > 1]
+        if dupes:
+            return "duplicate factors found: %s" % ', '.join(repr(x) for x in dupes)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

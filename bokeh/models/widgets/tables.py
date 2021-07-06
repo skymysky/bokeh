@@ -1,16 +1,85 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Various kinds of data table (data grid) widgets.
 
 '''
-from __future__ import absolute_import
 
-from ...core.enums import DateFormat, FontStyle, NumeralLanguage, TextAlign, RoundingFunction
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ...core.enums import (
+    AutosizeMode,
+    DateFormat,
+    FontStyle,
+    NumeralLanguage,
+    RoundingFunction,
+    TextAlign,
+)
 from ...core.has_props import abstract
-from ...core.properties import Bool, Color, Either, Enum, Float, Instance, Int, List, Override, String
+from ...core.properties import (
+    Bool,
+    Color,
+    Either,
+    Enum,
+    Float,
+    Instance,
+    Int,
+    List,
+    Override,
+    String,
+)
 from ...model import Model
-
-from ..sources import DataSource, CDSView
-
+from ..sources import CDSView, DataSource
 from .widget import Widget
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'AvgAggregator',
+    'BooleanFormatter',
+    'CellFormatter',
+    'CellEditor',
+    'CheckboxEditor',
+    'DataCube',
+    'DataTable',
+    'DateEditor',
+    'DateFormatter',
+    'GroupingInfo',
+    'HTMLTemplateFormatter',
+    'IntEditor',
+    'MaxAggregator',
+    'MinAggregator',
+    'NumberEditor',
+    'NumberFormatter',
+    'PercentEditor',
+    'ScientificFormatter',
+    'SelectEditor',
+    'StringEditor',
+    'StringFormatter',
+    'SumAggregator',
+    'TableColumn',
+    'TableWidget',
+    'TextEditor',
+    'TimeEditor',
+)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 @abstract
 class CellFormatter(Model):
@@ -23,6 +92,19 @@ class CellEditor(Model):
     ''' Abstract base class for data table's cell editors.
 
     '''
+
+@abstract
+class RowAggregator(Model):
+    ''' Abstract base class for data cube's row formatters.
+
+    '''
+    field_ = String('', help="""
+    Refers to the table column being aggregated
+    """)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class StringFormatter(CellFormatter):
     ''' Basic string cell formatter.
@@ -40,6 +122,29 @@ class StringFormatter(CellFormatter):
     text_color = Color(help="""
     An optional text color. See :class:`bokeh.core.properties.Color` for
     details.
+    """)
+
+class ScientificFormatter(StringFormatter):
+    ''' Display numeric values from continuous ranges as "basic numbers",
+    using scientific notation when appropriate by default.
+    '''
+
+    nan_format = String(help="""
+    Formatting to apply to NaN and None values (falls back to scientific formatting if not set).
+    """)
+
+    precision = Int(10, help="""
+    How many digits of precision to display.
+    """)
+
+    power_limit_high = Int(5, help="""
+    Limit the use of scientific notation to when::
+        log(x) >= power_limit_high
+    """)
+
+    power_limit_low = Int(-3, help="""
+    Limit the use of scientific notation to when::
+        log(x) <= power_limit_low
     """)
 
 class NumberFormatter(StringFormatter):
@@ -127,6 +232,10 @@ class NumberFormatter(StringFormatter):
     The language to use for formatting language-specific features (e.g. thousands separator).
     """)
 
+    nan_format = String(help="""
+    Formatting to apply to NaN and None values (falls back to Numbro formatting if not set).
+    """)
+
     rounding = Enum(RoundingFunction, help="""
     Rounding functions (round, floor, ceil) and their synonyms (nearest, rounddown, roundup).
     """)
@@ -140,7 +249,7 @@ class BooleanFormatter(CellFormatter):
     The icon visualizing the check mark.
     """)
 
-class DateFormatter(CellFormatter):
+class DateFormatter(StringFormatter):
     ''' Date cell formatter.
 
     '''
@@ -350,11 +459,18 @@ class DateFormatter(CellFormatter):
 
     """)
 
+    nan_format = String(help="""
+    Formatting to apply to NaN and None values (falls back to regular date formatting if not set).
+    """)
+
+
 class HTMLTemplateFormatter(CellFormatter):
     ''' HTML formatter using a template.
     This uses Underscore's `template` method and syntax.  http://underscorejs.org/#template
     The formatter has access other items in the row via the `dataContext` object passed to the formatter.
     So, for example, if another column in the datasource was named `url`, the template could access it as:
+
+    .. code-block:: jinja
 
         <a href="<%= url %>"><%= value %></a>
 
@@ -363,11 +479,17 @@ class HTMLTemplateFormatter(CellFormatter):
 
     Example: Simple HTML template to format the column value as code.
 
+    .. code-block:: python
+
         HTMLTemplateFormatter(template='<code><%= value %></code>')
 
     Example: Use values from other columns (`manufacturer` and `model`) to build a hyperlink.
 
-        HTMLTemplateFormatter(template='<a href="https:/www.google.com/search?q=<%= manufacturer %>+<%= model %>" target="_blank"><%= value %></a>')
+    .. code-block:: python
+
+        HTMLTemplateFormatter(template=
+            '<a href="https:/www.google.com/search?q=<%= manufacturer %>+<%= model %>" target="_blank"><%= value %></a>'
+        )
 
     '''
     template = String('<%= value %>', help="""
@@ -435,6 +557,26 @@ class DateEditor(CellEditor):
 
     '''
 
+class AvgAggregator(RowAggregator):
+    ''' Simple average across multiple rows.
+
+    '''
+
+class MinAggregator(RowAggregator):
+    ''' Smallest value across multiple rows.
+
+    '''
+
+class MaxAggregator(RowAggregator):
+    ''' Largest value across multiple rows.
+
+    '''
+
+class SumAggregator(RowAggregator):
+    ''' Simple sum across multiple rows.
+
+    '''
+
 class TableColumn(Model):
     ''' Table column widget.
 
@@ -490,7 +632,7 @@ class TableWidget(Widget):
     """)
 
     def __init__(self, **kw):
-        super(TableWidget, self).__init__(**kw)
+        super().__init__(**kw)
         if "view" not in kw:
             self.view = CDSView(source=self.source)
 
@@ -500,15 +642,54 @@ class DataTable(TableWidget):
 
     '''
 
+    autosize_mode = Enum(AutosizeMode, default="force_fit", help="""
+    Describes the column autosizing mode with one of the following options:
+
+    ``"fit_columns"``
+        Compute columns widths based on cell contents but ensure the
+        table fits into the available viewport. This results in no
+        horizontal scrollbar showing up, but data can get unreadable
+        if there is not enough space available.
+
+    ``"fit_viewport"``
+        Adjust the viewport size after computing columns widths based
+        on cell contents.
+
+    ``"force_fit"``
+        Fit columns into available space dividing the table width across
+        the columns equally (equivalent to `fit_columns=True`).
+        This results in no horizontal scrollbar showing up, but data
+        can get unreadable if there is not enough space available.
+
+    ``"none"``
+        Do not automatically compute column widths.
+    """)
+
+    auto_edit = Bool(False, help="""
+    When enabled editing mode is enabled after a single click on a
+    table cell.
+    """)
+
     columns = List(Instance(TableColumn), help="""
     The list of child column widgets.
     """)
 
-    fit_columns = Bool(True, help="""
+    fit_columns = Bool(help="""
     Whether columns should be fit to the available width. This results in no
     horizontal scrollbar showing up, but data can get unreadable if there is
-    no enough space available. If set to ``True``, columns' width is
+    not enough space available. If set to ``True``, columns' width is
     understood as maximum width.
+    """)
+
+    frozen_columns = Int(help="""
+    Integer indicating the number of columns to freeze. If set the first N
+    columns will be frozen which prevents them from scrolling out of frame.
+    """)
+
+    frozen_rows = Int(help="""
+    Integer indicating the number of rows to freeze. If set the first N
+    rows will be frozen which prevents them from scrolling out of frame,
+    if set to a negative value last N rows will be frozen.
     """)
 
     sortable = Bool(True, help="""
@@ -519,7 +700,7 @@ class DataTable(TableWidget):
     """)
 
     reorderable = Bool(True, help="""
-    Allows the reordering of a tables's columns. To reorder a column,
+    Allows the reordering of a table's columns. To reorder a column,
     click and drag a table's header to the desired location in the table.
     The columns on either side will remain in their previous order.
     """)
@@ -537,8 +718,24 @@ class DataTable(TableWidget):
     enabled) or using Shift + click on rows.
     """)
 
-    row_headers = Bool(True, help="""
-    Enable or disable row headers, i.e. the index column.
+    index_position = Int(0, help="""
+    Where among the list of columns to insert a column displaying the row
+    index. Negative indices are supported, and specify an index position
+    from the end of the list of columns (i.e. standard Python behaviour).
+
+    To prevent the index column from being added, set to None.
+
+    If the absolute value of index_position  is larger than the length of
+    the columns, then the index will appear at the beginning or end, depending
+    on the sign.
+    """)
+
+    index_header = String("#", help="""
+    The column header to display for the index column, if it is present.
+    """)
+
+    index_width = Int(40, help="""
+    The width of the index column, if present.
     """)
 
     scroll_to_selection = Bool(True, help="""
@@ -547,4 +744,51 @@ class DataTable(TableWidget):
     in the viewport.
     """)
 
+    header_row = Bool(True, help="""
+    Whether to show a header row with column names at the top of the table.
+    """)
+
+    width = Override(default=600)
+
     height = Override(default=400)
+
+    row_height = Int(25, help="""
+    The height of each row in pixels.
+    """)
+
+class GroupingInfo(Model):
+    '''Describes how to calculate totals and sub-totals
+    '''
+
+    getter = String('', help="""
+    References the column which generates the unique keys of this sub-total (groupby).
+    """)
+
+    aggregators = List(Instance(RowAggregator), help="""
+    Describes how to aggregate the columns which will populate this sub-total.
+    """)
+
+    collapsed = Bool(False, help="""
+    Whether the corresponding sub-total is expanded or collapsed by default.
+    """)
+
+class DataCube(DataTable):
+    '''Specialized DataTable with collapsing groups, totals, and sub-totals.
+    '''
+
+    grouping = List(Instance(GroupingInfo), help="""
+    Describe what aggregation operations used to define sub-totals and totals
+    """)
+
+    target = Instance(DataSource, help="""
+    Two column datasource (row_indices & labels) describing which rows of the
+    data cubes are expanded or collapsed
+    """)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

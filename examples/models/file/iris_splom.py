@@ -1,11 +1,8 @@
-from __future__ import print_function
-
 from bokeh.document import Document
 from bokeh.embed import file_html
 from bokeh.layouts import gridplot
-from bokeh.models.glyphs import Circle
-from bokeh.models import (BasicTicker, ColumnDataSource, Grid, LinearAxis,
-                         DataRange1d, PanTool, Plot, WheelZoomTool)
+from bokeh.models import (BasicTicker, Circle, ColumnDataSource, DataRange1d,
+                          Grid, LinearAxis, PanTool, Plot, WheelZoomTool,)
 from bokeh.resources import INLINE
 from bokeh.sampledata.iris import flowers
 from bokeh.util.browser import view
@@ -45,6 +42,7 @@ def make_plot(xname, yname, xax=False, yax=False):
     xticker = BasicTicker()
     if xax:
         xaxis = LinearAxis()
+        xaxis.axis_label = xname
         plot.add_layout(xaxis, 'below')
         xticker = xaxis.ticker
     plot.add_layout(Grid(dimension=0, ticker=xticker))
@@ -52,6 +50,8 @@ def make_plot(xname, yname, xax=False, yax=False):
     yticker = BasicTicker()
     if yax:
         yaxis = LinearAxis()
+        yaxis.axis_label = yname
+        yaxis.major_label_orientation = 'vertical'
         plot.add_layout(yaxis, 'left')
         yticker = yaxis.ticker
     plot.add_layout(Grid(dimension=1, ticker=yticker))

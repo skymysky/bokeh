@@ -1,30 +1,28 @@
-# -*- coding: utf-8 -*-
 import pandas as pd
 
-from bokeh.core.properties import field
 from bokeh.io import curdoc
 from bokeh.layouts import layout
-from bokeh.models import (
-    ColumnDataSource, HoverTool, SingleIntervalTicker, Slider, Button, Label,
-    CategoricalColorMapper,
-)
+from bokeh.models import (Button, CategoricalColorMapper, ColumnDataSource,
+                          HoverTool, Label, SingleIntervalTicker, Slider,)
 from bokeh.palettes import Spectral6
 from bokeh.plotting import figure
 
-from data import process_data
+from .data import process_data
 
 fertility_df, life_expectancy_df, population_df_size, regions_df, years, regions_list = process_data()
 
-p = pd.Panel({'fertility': fertility_df, 'life': life_expectancy_df, 'population': population_df_size})
+df = pd.concat({'fertility': fertility_df,
+                'life': life_expectancy_df,
+                'population': population_df_size},
+               axis=1)
 
 data = {}
 
-region_name = regions_df.Group
-region_name.name = 'region'
-
+regions_df.rename({'Group':'region'}, axis='columns', inplace=True)
 for year in years:
-    df = pd.concat([p.loc[:, :, year], region_name], axis=1).reset_index()
-    data[year] = df.to_dict('series')
+    df_year = df.iloc[:,df.columns.get_level_values(1)==year]
+    df_year.columns = df_year.columns.droplevel(1)
+    data[year] = df_year.join(regions_df.region).reset_index().to_dict('series')
 
 source = ColumnDataSource(data=data[years[0]])
 
@@ -34,7 +32,7 @@ plot.xaxis.axis_label = "Children per woman (total fertility)"
 plot.yaxis.ticker = SingleIntervalTicker(interval=20)
 plot.yaxis.axis_label = "Life expectancy at birth (years)"
 
-label = Label(x=1.1, y=18, text=str(years[0]), text_font_size='70pt', text_color='#eeeeee')
+label = Label(x=1.1, y=18, text=str(years[0]), text_font_size='93px', text_color='#eeeeee')
 plot.add_layout(label)
 
 color_mapper = CategoricalColorMapper(palette=Spectral6, factors=regions_list)
@@ -48,9 +46,9 @@ plot.circle(
     line_color='#7c7e71',
     line_width=0.5,
     line_alpha=0.5,
-    legend=field('region'),
+    legend_group='region',
 )
-plot.add_tools(HoverTool(tooltips="@index", show_arrow=False, point_policy='follow_mouse'))
+plot.add_tools(HoverTool(tooltips="@Country", show_arrow=False, point_policy='follow_mouse'))
 
 
 def animate_update():
@@ -68,14 +66,16 @@ def slider_update(attrname, old, new):
 slider = Slider(start=years[0], end=years[-1], value=years[0], step=1, title="Year")
 slider.on_change('value', slider_update)
 
+callback_id = None
 
 def animate():
+    global callback_id
     if button.label == '► Play':
         button.label = '❚❚ Pause'
-        curdoc().add_periodic_callback(animate_update, 200)
+        callback_id = curdoc().add_periodic_callback(animate_update, 200)
     else:
         button.label = '► Play'
-        curdoc().remove_periodic_callback(animate_update)
+        curdoc().remove_periodic_callback(callback_id)
 
 button = Button(label='► Play', width=60)
 button.on_click(animate)

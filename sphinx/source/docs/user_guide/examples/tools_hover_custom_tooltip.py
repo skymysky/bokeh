@@ -1,5 +1,4 @@
-from bokeh.plotting import figure, output_file, show, ColumnDataSource
-from bokeh.models import HoverTool
+from bokeh.plotting import ColumnDataSource, figure, output_file, show
 
 output_file("toolbar.html")
 
@@ -8,11 +7,11 @@ source = ColumnDataSource(data=dict(
     y=[2, 5, 8, 2, 7],
     desc=['A', 'b', 'C', 'd', 'E'],
     imgs=[
-        'https://bokeh.pydata.org/static/snake.jpg',
-        'https://bokeh.pydata.org/static/snake2.png',
-        'https://bokeh.pydata.org/static/snake3D.png',
-        'https://bokeh.pydata.org/static/snake4_TheRevenge.png',
-        'https://bokeh.pydata.org/static/snakebite.jpg'
+        'https://docs.bokeh.org/static/snake.jpg',
+        'https://docs.bokeh.org/static/snake2.png',
+        'https://docs.bokeh.org/static/snake3D.png',
+        'https://docs.bokeh.org/static/snake4_TheRevenge.png',
+        'https://docs.bokeh.org/static/snakebite.jpg'
     ],
     fonts=[
         '<i>italics</i>',
@@ -23,7 +22,7 @@ source = ColumnDataSource(data=dict(
     ]
 ))
 
-hover = HoverTool( tooltips="""
+TOOLTIPS = """
     <div>
         <div>
             <img
@@ -44,10 +43,9 @@ hover = HoverTool( tooltips="""
             <span style="font-size: 10px; color: #696;">($x, $y)</span>
         </div>
     </div>
-    """
-)
+"""
 
-p = figure(plot_width=400, plot_height=400, tools=[hover],
+p = figure(plot_width=400, plot_height=400, tooltips=TOOLTIPS,
            title="Mouse over the dots")
 
 p.circle('x', 'y', size=20, source=source)

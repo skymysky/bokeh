@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a base class for objects that can have declarative, typed,
 serializable properties.
 
@@ -8,42 +14,47 @@ serializable properties.
     anyone who is not directly developing on Bokeh's own infrastructure.
 
 '''
-from __future__ import absolute_import
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import difflib
-import inspect
-from operator import itemgetter
-import sys
+from typing import Any, Dict
 from warnings import warn
 
-from six import StringIO
-
-from ..util.dependencies import import_optional
-from ..util.future import with_metaclass
+# Bokeh imports
 from ..util.string import nice_join
-from .property.containers import PropertyValueContainer
 from .property.descriptor_factory import PropertyDescriptorFactory
 from .property.override import Override
+from .property.wrappers import PropertyValueContainer
 
-_ABSTRACT_ADMONITION = '''
-    .. note::
-        This is an abstract base class used to help organize the hierarchy of Bokeh
-        model types. **It is not useful to instantiate on its own.**
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-'''
+__all__ = (
+    'abstract',
+    'accumulate_dict_from_superclasses',
+    'accumulate_from_superclasses',
+    'HasProps',
+    'MetaHasProps',
+)
 
-_EXAMPLE_TEMPLATE = '''
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
-    Example
-    -------
-
-    .. bokeh-plot:: ../%(path)s
-        :source-position: below
-
-'''
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 def abstract(cls):
     ''' A decorator to mark abstract base classes derived from |HasProps|.
@@ -138,7 +149,7 @@ class MetaHasProps(type):
             if "__doc__" in class_dict and class_dict["__doc__"] is not None:
                 class_dict["__doc__"] += _EXAMPLE_TEMPLATE % dict(path=path)
 
-        return super(MetaHasProps, meta_cls).__new__(meta_cls, class_name, bases, class_dict)
+        return super().__new__(meta_cls, class_name, bases, class_dict)
 
     def __init__(cls, class_name, bases, nmspc):
         if class_name == 'HasProps':
@@ -187,7 +198,7 @@ def accumulate_from_superclasses(cls, propname):
     # classes, and the cache must be separate for each class
     if cachename not in cls.__dict__:
         s = set()
-        for c in inspect.getmro(cls):
+        for c in cls.__mro__:
             if issubclass(c, HasProps) and hasattr(c, propname):
                 base = getattr(c, propname)
                 s.update(base)
@@ -210,7 +221,7 @@ def accumulate_dict_from_superclasses(cls, propname):
     # classes, and the cache must be separate for each class
     if cachename not in cls.__dict__:
         d = dict()
-        for c in inspect.getmro(cls):
+        for c in cls.__mro__:
             if issubclass(c, HasProps) and hasattr(c, propname):
                 base = getattr(c, propname)
                 for k,v in base.items():
@@ -219,15 +230,17 @@ def accumulate_dict_from_superclasses(cls, propname):
         setattr(cls, cachename, d)
     return cls.__dict__[cachename]
 
-class HasProps(with_metaclass(MetaHasProps, object)):
+class HasProps(metaclass=MetaHasProps):
     ''' Base class for all class types that have Bokeh properties.
 
     '''
+    _initialized: bool = False
+
     def __init__(self, **properties):
         '''
 
         '''
-        super(HasProps, self).__init__()
+        super().__init__()
         self._property_values = dict()
         self._unstable_default_values = dict()
         self._unstable_themed_values = dict()
@@ -235,12 +248,13 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         for name, value in properties.items():
             setattr(self, name, value)
 
+        self._initialized = True
+
     def __setattr__(self, name, value):
         ''' Intercept attribute setting on HasProps in order to special case
         a few situations:
 
         * short circuit all property machinery for ``_private`` attributes
-        * handle setting ``__deprecated_attributes__``
         * suggest similar attribute names on attribute errors
 
         Args:
@@ -254,14 +268,14 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         # self.properties() below can be expensive so avoid it
         # if we're just setting a private underscore field
         if name.startswith("_"):
-            super(HasProps, self).__setattr__(name, value)
+            super().__setattr__(name, value)
             return
 
         props = sorted(self.properties())
-        deprecated = getattr(self, '__deprecated_attributes__', [])
+        descriptor = getattr(self.__class__, name, None)
 
-        if name in props or name in deprecated:
-            super(HasProps, self).__setattr__(name, value)
+        if name in props or (descriptor is not None and descriptor.fset is not None):
+            super().__setattr__(name, value)
         else:
             matches, text = difflib.get_close_matches(name.lower(), props), "similar"
 
@@ -330,7 +344,7 @@ class HasProps(with_metaclass(MetaHasProps, object)):
             descriptor = self.lookup(name)
             descriptor.set_from_json(self, json, models, setter)
         else:
-            log.warn("JSON had attr %r on obj %r, which is a client-only or invalid attribute that shouldn't have been sent", name, self)
+            log.warning("JSON had attr %r on obj %r, which is a client-only or invalid attribute that shouldn't have been sent", name, self)
 
     def update(self, **kwargs):
         ''' Updates the object's properties from the given keyword arguments.
@@ -458,7 +472,7 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         properties defined on any parent classes.
 
         Returns:
-            set[str] : names of DataSpec properties
+            set[str] : names of ``DataSpec`` properties
 
         '''
         return set(cls.dataspecs_with_props().keys())
@@ -477,7 +491,7 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         '''
         return accumulate_dict_from_superclasses(cls, "__dataspecs__")
 
-    def properties_with_values(self, include_defaults=True):
+    def properties_with_values(self, include_defaults: bool = True) -> Dict[str, Any]:
         ''' Collect a dict mapping property names to their values.
 
         This method *always* traverses the class hierarchy and includes
@@ -583,7 +597,7 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         old_dict = self.themed_values()
 
         # if the same theme is set again, it should reuse the same dict
-        if old_dict is property_values:
+        if old_dict is property_values:  # lgtm [py/comparison-using-is]
             return
 
         removed = set()
@@ -621,101 +635,6 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         '''
         self.apply_theme(property_values=dict())
 
-    def pretty(self, verbose=False, max_width=79, newline='\n'):
-        ''' Generate a "pretty" string representation of the object.
-
-        .. note::
-            This function only functions in the IPython shell or
-            Jupyter Notebooks.
-
-        Args:
-            Verbose (bool, optional) :
-                This is a conventional argument for IPython representation
-                printers but is unused by Bokeh. (default: False)
-
-            max_width (int, optional) :
-                Minimum width to start breaking lines when possible. (default: 79)
-
-            newline (str, optional) :
-                Character to use to separate each line (default: ``\\n``)
-
-        Returns:
-            str : pretty object representation
-
-        Raises:
-            ValueError, if ``IPython`` cannot be imported
-
-        '''
-        IPython = import_optional('IPython')
-
-        if IPython:
-            from IPython.lib.pretty import RepresentationPrinter
-
-        class _BokehPrettyPrinter(RepresentationPrinter):
-            def __init__(self, output, verbose=False, max_width=79, newline='\n'):
-                super(_BokehPrettyPrinter, self).__init__(output, verbose, max_width, newline)
-                self.type_pprinters[HasProps] = lambda obj, p, cycle: obj._repr_pretty(p, cycle)
-
-        if not IPython:
-            cls = self.__class__
-            raise RuntimeError("%s.%s.pretty() requires IPython" % (cls.__module__, cls.__name__))
-        else:
-            stream = StringIO()
-            printer = _BokehPrettyPrinter(stream, verbose, max_width, newline)
-            printer.pretty(self)
-            printer.flush()
-            return stream.getvalue()
-
-    def pprint(self, verbose=False, max_width=79, newline='\n'):
-        ''' Print a "pretty" string representation of the object to stdout.
-
-        .. note::
-            This function only functions in the IPython shell or
-            Jupyter Notebooks.
-
-        Args:
-            Verbose (bool, optional) :
-                This is a conventional argument for IPython representation
-                printers but is unused by Bokeh. (default: False)
-
-            max_width (int, optional) :
-                Minimum width to start breaking lines when possible. (default: 79)
-
-            newline (str, optional) :
-                Character to use to separate each line (default: ``\\n``)
-
-        Returns:
-            None
-
-        Raises:
-            ValueError, if ``IPython`` cannot be imported
-
-        Examples:
-
-            .. code-block:: python
-
-                In [1]: from bokeh.models import Range1d
-
-                In [1]: r = Range1d(start=10, end=20)
-
-                In [2]: r.pprint()
-                bokeh.models.ranges.Range1d(
-                    id='1576d21a-0c74-4214-8d8f-ad415e1e4ed4',
-                    bounds=None,
-                    callback=None,
-                    end=20,
-                    js_property_callbacks={},
-                    max_interval=None,
-                    min_interval=None,
-                    name=None,
-                    start=10,
-                    tags=[])
-
-        '''
-        sys.stdout.write(self.pretty())
-        sys.stdout.write(newline)
-        sys.stdout.flush()
-
     def _clone(self):
         ''' Duplicate a HasProps object.
 
@@ -724,25 +643,28 @@ class HasProps(with_metaclass(MetaHasProps, object)):
         '''
         return self.__class__(**self._property_values)
 
-    def _repr_pretty(self, p, cycle):
-        '''
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
 
-        '''
-        name = "%s.%s" % (self.__class__.__module__, self.__class__.__name__)
+_ABSTRACT_ADMONITION = '''
+    .. note::
+        This is an abstract base class used to help organize the hierarchy of Bokeh
+        model types. **It is not useful to instantiate on its own.**
 
-        if cycle:
-            p.text("%s(...)" % name)
-        else:
-            with p.group(4, '%s(' % name, ')'):
-                props = self.properties_with_values().items()
-                sorted_props = sorted(props, key=itemgetter(0))
-                all_props = sorted_props
-                for i, (prop, value) in enumerate(all_props):
-                    if i == 0:
-                        p.breakable('')
-                    else:
-                        p.text(',')
-                        p.breakable()
-                    p.text(prop)
-                    p.text('=')
-                    p.pretty(value)
+'''
+
+# The "../../" is needed for bokeh-plot to construct the correct path to examples
+_EXAMPLE_TEMPLATE = '''
+
+    Example
+    -------
+
+    .. bokeh-plot:: ../../%(path)s
+        :source-position: below
+
+'''
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 """ Configure the logging system for Bokeh.
 
 By default, logging is not configured, to allow users of Bokeh to have full
@@ -15,20 +21,68 @@ in order of increasing severity:
 
 The default logging level is ``none``.
 """
-from __future__ import absolute_import
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import sys
+from typing import Any, Optional, cast
 
+# Bokeh imports
 from ..settings import settings
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+  'basicConfig',
+)
+
+default_handler: Optional[logging.Handler] = None
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+# TODO: needs typings for basicConfig()
+def basicConfig(**kwargs: Any) -> None:
+    """
+    A logging.basicConfig() wrapper that also undoes the default
+    Bokeh-specific configuration.
+    """
+    if default_handler is not None:
+        bokeh_logger.removeHandler(default_handler)
+        bokeh_logger.propagate = True
+    logging.basicConfig(**kwargs)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
 
 TRACE = 9
 logging.addLevelName(TRACE, "TRACE")
-def trace(self, message, *args, **kws):
+def trace(self: logging.Logger, message: str, *args: Any, **kws: Any) -> None:
     if self.isEnabledFor(TRACE):
         self._log(TRACE, message, args, **kws)
-logging.Logger.trace = trace
-logging.TRACE = TRACE
+cast(Any, logging).Logger.trace = trace
+cast(Any, logging).TRACE = TRACE
 
 level = settings.py_log_level()
 bokeh_logger = logging.getLogger('bokeh')
@@ -46,16 +100,3 @@ if not (root_logger.handlers or bokeh_logger.handlers):
     # Avoid printing out twice if the root logger is later configured
     # by user.
     bokeh_logger.propagate = False
-else:
-    default_handler = None
-
-
-def basicConfig(*args, **kwargs):
-    """
-    A logging.basicConfig() wrapper that also undoes the default
-    Bokeh-specific configuration.
-    """
-    if default_handler is not None:
-        bokeh_logger.removeHandler(default_handler)
-        bokeh_logger.propagate = True
-    return logging.basicConfig(*args, **kwargs)

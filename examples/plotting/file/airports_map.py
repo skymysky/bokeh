@@ -1,32 +1,26 @@
-from __future__ import print_function
-
-from bokeh.layouts import row
-from bokeh.models import (
-    Range1d, WMTSTileSource, ColumnDataSource, HoverTool,
-)
-from bokeh.plotting import figure, show, output_file
+from bokeh.layouts import column, gridplot
+from bokeh.models import Div, Range1d, WMTSTileSource
+from bokeh.plotting import figure, show
 from bokeh.sampledata.airports import data as airports
-from bokeh.tile_providers import CARTODBPOSITRON
+from bokeh.tile_providers import CARTODBPOSITRON, get_provider
 
-points_source = ColumnDataSource(airports)
 title = "US Airports: Field Elevation > 1500m"
 
-def plot(tile_source, filename):
-    output_file(filename, title=title)
+def plot(tile_source):
 
     # set to roughly extent of points
     x_range = Range1d(start=airports['x'].min() - 10000, end=airports['x'].max() + 10000, bounds=None)
     y_range = Range1d(start=airports['y'].min() - 10000, end=airports['y'].max() + 10000, bounds=None)
 
     # create plot and add tools
-    p = figure(tools='wheel_zoom,pan', x_range=x_range, y_range=y_range, title=title)
+    p = figure(tools='hover,wheel_zoom,pan,reset', x_range=x_range, y_range=y_range, title=title,
+               tooltips=[("Name", "@name"), ("Elevation", "@elevation (m)")],
+               plot_width=400, plot_height=400)
     p.axis.visible = False
-    hover_tool = HoverTool(tooltips=[("Name", "@name"), ("Elevation", "@elevation (m)")])
-    p.add_tools(hover_tool)
     p.add_tile(tile_source)
 
     # create point glyphs
-    p.circle(x='x', y='y', size=9, fill_color="#F46B42", line_color="#D2C4C1", line_width=1.5, source=points_source)
+    p.circle(x='x', y='y', size=10, fill_color="#F46B42", line_color="white", line_width=2, source=airports)
     return p
 
 # create a tile source
@@ -40,7 +34,19 @@ tile_options['attribution'] = """
     """
 mq_tile_source = WMTSTileSource(**tile_options)
 
-carto = plot(CARTODBPOSITRON, 'airports_map_cartodb.html')
-mq = plot(mq_tile_source, 'airports_map.html')
+carto = plot(get_provider(CARTODBPOSITRON))
+mq = plot(mq_tile_source)
 
-show(row([carto, mq]))
+# link panning
+mq.x_range = carto.x_range
+mq.y_range = carto.y_range
+
+div = Div(text="""
+<p>This example shows the same data on two separate tile plots. The left plot
+is using a built-in CartoDB tile source, and is using  a customized tile source
+configured for OpenStreetMap.</p>
+""", width=800)
+
+layout = column(div, gridplot([[carto, mq]], toolbar_location="right"))
+
+show(layout)

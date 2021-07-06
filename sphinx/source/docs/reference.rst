@@ -1,7 +1,14 @@
 .. _refguide:
 
-Reference Guide
-###############
+Reference
+#########
+
+.. toctree::
+    :maxdepth: 2
+    :hidden:
+    :glob:
+
+    reference/*
 
 This section provides the complete public API reference for Bokeh,
 auto-generated from the docstrings in the project source code.
@@ -19,10 +26,10 @@ be especially useful.
 
 :ref:`bokeh.plotting`
     The ``bokeh.plotting`` API is centered around the
-    :func:`~bokeh.plotting.figure.figure` command,
+    :func:`~bokeh.plotting.figure` command,
     and the associated glyph functions such as
-    :func:`~bokeh.plotting.figure.Figure.circle`,
-    :func:`~bokeh.plotting.figure.Figure.wedge`, etc.
+    :func:`~bokeh.plotting.Figure.circle`,
+    :func:`~bokeh.plotting.Figure.wedge`, etc.
     This section has detailed information on these elements.
 
 :ref:`bokeh.layouts`

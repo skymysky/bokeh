@@ -1,8 +1,7 @@
 import numpy as np
 
-from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid
-from bokeh.models.glyphs import Patches
 from bokeh.io import curdoc, show
+from bokeh.models import ColumnDataSource, Grid, LinearAxis, Patches, Plot
 
 N = 9
 x = np.linspace(-2, 2, N)
@@ -17,12 +16,9 @@ source = ColumnDataSource(dict(
     )
 )
 
-xdr = DataRange1d()
-ydr = DataRange1d()
-
 plot = Plot(
-    title=None, x_range=xdr, y_range=ydr, plot_width=300, plot_height=300,
-    h_symmetry=False, v_symmetry=False, min_border=0, toolbar_location=None)
+    title=None, plot_width=300, plot_height=300,
+    min_border=0, toolbar_location=None)
 
 glyph = Patches(xs="xs", ys="ys", fill_color="#fb9a99")
 plot.add_glyph(source, glyph)

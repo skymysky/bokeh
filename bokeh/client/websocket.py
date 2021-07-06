@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -13,40 +12,35 @@ and smooths some compatibility issues.
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
-# Standard library imports
-
 # External imports
-from tornado import gen, locks
+from tornado import locks
 from tornado.websocket import WebSocketError
-
-# Bokeh imports
 
 #-----------------------------------------------------------------------------
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'WebSocketClientConnectionWrapper',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
-@internal((1,0,0))
-class WebSocketClientConnectionWrapper(object):
-    ''' Used for compat across Tornado versions and to add write_lock'''
+class WebSocketClientConnectionWrapper:
+    ''' Used for compatibility across Tornado versions and to add write_lock'''
 
     def __init__(self, socket):
         if socket is None:
@@ -58,9 +52,7 @@ class WebSocketClientConnectionWrapper(object):
 
     # Internal methods --------------------------------------------------------
 
-    @gen.coroutine
-    @internal((1,0,0))
-    def write_message(self, message, binary=False, locked=True):
+    async def write_message(self, message, binary=False, locked=True):
         ''' Write a message to the websocket after obtaining the appropriate
         Bokeh Document lock.
 
@@ -77,21 +69,19 @@ class WebSocketClientConnectionWrapper(object):
 
             future = self._socket.write_message(message, binary)
 
-            # don't yield this future or we're blocking on ourselves!
-            raise gen.Return(future)
+            # don't await this future or we're blocking on ourselves!
+            return future
 
         if locked:
-            with (yield self.write_lock.acquire()):
+            with await self.write_lock.acquire():
                 write_message_unlocked()
         else:
             write_message_unlocked()
 
-    @internal((1,0,0))
     def close(self, code=None, reason=None):
         ''' Close the websocket. '''
         return self._socket.close(code, reason)
 
-    @internal((1,0,0))
     def read_message(self, callback=None):
         ''' Read a message from websocket and execute a callback.
 

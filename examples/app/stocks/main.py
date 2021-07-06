@@ -18,27 +18,14 @@ at your command prompt. Then navigate to the URL
 .. _README: https://github.com/bokeh/bokeh/blob/master/examples/app/stocks/README.md
 
 '''
-try:
-    from functools import lru_cache
-except ImportError:
-    # Python 2 does stdlib does not have lru_cache so let's just
-    # create a dummy decorator to avoid crashing
-    print ("WARNING: Cache for this example is available on Python 3 only.")
-    def lru_cache():
-        def dec(f):
-            def _(*args, **kws):
-                return f(*args, **kws)
-            return _
-        return dec
-
+from functools import lru_cache
 from os.path import dirname, join
 
 import pandas as pd
 
 from bokeh.io import curdoc
-from bokeh.layouts import row, column
-from bokeh.models import ColumnDataSource
-from bokeh.models.widgets import PreText, Select
+from bokeh.layouts import column, row
+from bokeh.models import ColumnDataSource, PreText, Select
 from bokeh.plotting import figure
 
 DATA_DIR = join(dirname(__file__), 'daily')
@@ -107,11 +94,12 @@ def ticker2_change(attrname, old, new):
 def update(selected=None):
     t1, t2 = ticker1.value, ticker2.value
 
-    data = get_data(t1, t2)
-    source.data = source.from_df(data[['t1', 't2', 't1_returns', 't2_returns']])
-    source_static.data = source.data
+    df = get_data(t1, t2)
+    data = df[['t1', 't2', 't1_returns', 't2_returns']]
+    source.data = data
+    source_static.data = data
 
-    update_stats(data, t1, t2)
+    update_stats(df, t1, t2)
 
     corr.title.text = '%s returns vs. %s returns' % (t1, t2)
     ts1.title.text, ts2.title.text = t1, t2
@@ -125,12 +113,12 @@ ticker2.on_change('value', ticker2_change)
 def selection_change(attrname, old, new):
     t1, t2 = ticker1.value, ticker2.value
     data = get_data(t1, t2)
-    selected = source.selected['1d']['indices']
+    selected = source.selected.indices
     if selected:
         data = data.iloc[selected, :]
     update_stats(data, t1, t2)
 
-source.on_change('selected', selection_change)
+source.selected.on_change('indices', selection_change)
 
 # set up layout
 widgets = column(ticker1, ticker2, stats)

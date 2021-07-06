@@ -1,19 +1,242 @@
-from __future__ import absolute_import, print_function
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
-import logging
-logger = logging.getLogger(__name__)
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from six import string_types
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
 
+# Bokeh imports
 from ..core.enums import HorizontalLocation, VerticalLocation
-from ..core.properties import Auto, Either, Enum, Int, Seq, Instance, String
-from ..models import GMapPlot, LinearAxis, MercatorTicker, MercatorTickFormatter, Range1d, Title, Tool
-from ..models import glyphs, markers
+from ..core.properties import Auto, Either, Enum, Instance, Int, Seq, String
+from ..models import (
+    GMapPlot,
+    LinearAxis,
+    MercatorTicker,
+    MercatorTickFormatter,
+    Range1d,
+    Title,
+    Tool,
+)
 from ..models.tools import Drag, Inspection, Scroll, Tap
 from ..util.options import Options
-from .helpers import _process_tools_arg, _process_active_tools, _glyph_function
+from ._tools import process_active_tools, process_tools_arg
+from .figure import Figure
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
 DEFAULT_TOOLS = "pan,wheel_zoom,reset,help"
+
+__all__ = (
+    'GMap',
+    'GMapFigureOptions',
+    'gmap'
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+class GMap(GMapPlot):
+    ''' A subclass of :class:`~bokeh.models.plots.Plot` that simplifies plot
+    creation with default axes, grids, tools, etc.
+
+    Args:
+        google_api_key (str):
+            Google requires an API key be supplied for maps to function. See:
+
+            https://developers.google.com/maps/documentation/javascript/get-api-key
+
+        map_options: (:class:`~bokeh.models.map_plots.GMapOptions`)
+            Configuration specific to a Google Map
+
+    In addition to all the Bokeh model property attributes documented below,
+    the ``Figure`` initializer also accepts the following options, which can
+    help simplify configuration:
+
+    .. bokeh-options:: GMapFigureOptions
+        :module: bokeh.plotting.gmap
+
+    '''
+
+    __subtype__ = "GMap"
+    __view_model__ = "GMapPlot"
+
+    def __init__(self, **kw):
+
+        if 'plot_width' in kw and 'width' in kw:
+            raise ValueError("Figure called with both 'plot_width' and 'width' supplied, supply only one")
+        if 'plot_height' in kw and 'height' in kw:
+            raise ValueError("Figure called with both 'plot_height' and 'height' supplied, supply only one")
+        if 'height' in kw:
+            kw['plot_height'] = kw.pop('height')
+        if 'width' in kw:
+            kw['plot_width'] = kw.pop('width')
+
+        opts = GMapFigureOptions(kw)
+
+        title = kw.get("title", None)
+        if isinstance(title, str):
+            kw['title'] = Title(text=title)
+
+        super().__init__(x_range=Range1d(), y_range=Range1d(), **kw)
+
+        xf = MercatorTickFormatter(dimension="lon")
+        xt = MercatorTicker(dimension="lon")
+        self.add_layout(LinearAxis(formatter=xf, ticker=xt), 'below')
+
+        yf = MercatorTickFormatter(dimension="lat")
+        yt = MercatorTicker(dimension="lat")
+        self.add_layout(LinearAxis(formatter=yf, ticker=yt), 'left')
+
+        tool_objs, tool_map = process_tools_arg(self, opts.tools)
+        self.add_tools(*tool_objs)
+        process_active_tools(self.toolbar, tool_map, opts.active_drag, opts.active_inspect, opts.active_scroll, opts.active_tap)
+
+
+    annular_wedge = Figure.annular_wedge
+
+    annulus = Figure.annulus
+
+    arc = Figure.arc
+
+    asterisk = Figure.asterisk
+
+    bezier = Figure.bezier
+
+    circle = Figure.circle
+
+    circle_cross = Figure.circle_cross
+
+    circle_x = Figure.circle_x
+
+    cross = Figure.cross
+
+    dash = Figure.dash
+
+    diamond = Figure.diamond
+
+    diamond_cross = Figure.diamond_cross
+
+    graph = Figure.graph
+
+    harea = Figure.harea
+
+    harea_stack = Figure.harea_stack
+
+    hbar = Figure.hbar
+
+    hbar_stack = Figure.hbar_stack
+
+    hline_stack = Figure.hline_stack
+
+    ellipse = Figure.ellipse
+
+    hex = Figure.hex
+
+    hexbin = Figure.hexbin
+
+    hex_tile = Figure.hex_tile
+
+    image = Figure.image
+
+    image_rgba = Figure.image_rgba
+
+    image_url = Figure.image_url
+
+    inverted_triangle = Figure.inverted_triangle
+
+    line = Figure.line
+
+    multi_line = Figure.multi_line
+
+    multi_polygons = Figure.multi_polygons
+
+    oval = Figure.oval
+
+    patch = Figure.patch
+
+    patches = Figure.patches
+
+    quad = Figure.quad
+
+    quadratic = Figure.quadratic
+
+    ray = Figure.ray
+
+    rect = Figure.rect
+
+    step = Figure.step
+
+    scatter = Figure.scatter
+
+    segment = Figure.segment
+
+    square = Figure.square
+
+    square_cross = Figure.square_cross
+
+    square_x = Figure.square_x
+
+    text = Figure.text
+
+    triangle = Figure.triangle
+
+    varea = Figure.varea
+
+    varea_stack = Figure.varea_stack
+
+    vbar = Figure.vbar
+
+    vbar_stack = Figure.vbar_stack
+
+    vline_stack = Figure.vline_stack
+
+    wedge = Figure.wedge
+
+    x = Figure.x
+
+def gmap(google_api_key, map_options, **kwargs):
+    ''' Create a new :class:`~bokeh.plotting.gmap.GMap` for plotting.
+
+    Args:
+        google_api_key (str):
+            Google requires an API key be supplied for maps to function. See:
+
+            https://developers.google.com/maps/documentation/javascript/get-api-key
+
+            The Google API key will be stored in the Bokeh Document JSON.
+
+        map_options: (:class:`~bokeh.models.map_plots.GMapOptions`)
+            Configuration specific to a Google Map
+
+    In addition to the standard :class:`~bokeh.plotting.gmap.GMap` keyword
+    arguments (e.g. ``plot_width`` or ``sizing_mode``), the following
+    additional options can be passed as well:
+
+    .. bokeh-options:: GMapFigureOptions
+        :module: bokeh.plotting.gmap
+
+    Returns:
+       GMap
+
+    '''
+    return GMap(api_key=google_api_key, map_options=map_options, **kwargs)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class GMapFigureOptions(Options):
 
@@ -61,137 +284,10 @@ class GMapFigureOptions(Options):
     Which tap tool should initially be active.
     """)
 
-class GMap(GMapPlot):
-    ''' A subclass of :class:`~bokeh.models.plots.Plot` that simplifies plot
-    creation with default axes, grids, tools, etc.
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
 
-    In addition to all the Bokeh model property attributes documented below,
-    the ``Figure`` initializer also accepts the following options, which can
-    help simplify configuration:
-
-    .. bokeh-options:: GMapFigureOptions
-        :module: bokeh.plotting.figure
-
-    '''
-
-    __subtype__ = "GMap"
-    __view_model__ = "GMapPlot"
-
-    def __init__(self, google_api_key, map_options, **kw):
-
-        if 'plot_width' in kw and 'width' in kw:
-            raise ValueError("Figure called with both 'plot_width' and 'width' supplied, supply only one")
-        if 'plot_height' in kw and 'height' in kw:
-            raise ValueError("Figure called with both 'plot_height' and 'height' supplied, supply only one")
-        if 'height' in kw:
-            kw['plot_height'] = kw.pop('height')
-        if 'width' in kw:
-            kw['plot_width'] = kw.pop('width')
-
-        opts = GMapFigureOptions(kw)
-
-        title = kw.get("title", None)
-        if isinstance(title, string_types):
-            kw['title'] = Title(text=title)
-
-        super(GMap, self).__init__(api_key=google_api_key, map_options=map_options,
-                                   x_range=Range1d(), y_range=Range1d(), **kw)
-
-        xf = MercatorTickFormatter(dimension="lon")
-        xt = MercatorTicker(dimension="lon")
-        self.add_layout(LinearAxis(formatter=xf, ticker=xt), 'below')
-
-        yf = MercatorTickFormatter(dimension="lat")
-        yt = MercatorTicker(dimension="lat")
-        self.add_layout(LinearAxis(formatter=yf, ticker=yt), 'left')
-
-        tool_objs, tool_map = _process_tools_arg(self, opts.tools)
-        self.add_tools(*tool_objs)
-        _process_active_tools(self.toolbar, tool_map, opts.active_drag, opts.active_inspect, opts.active_scroll, opts.active_tap)
-
-    annular_wedge = _glyph_function(glyphs.AnnularWedge)
-
-    annulus = _glyph_function(glyphs.Annulus)
-
-    arc = _glyph_function(glyphs.Arc)
-
-    asterisk = _glyph_function(markers.Asterisk)
-
-    bezier = _glyph_function(glyphs.Bezier)
-
-    circle = _glyph_function(markers.Circle)
-
-    circle_cross = _glyph_function(markers.CircleCross)
-
-    circle_x = _glyph_function(markers.CircleX)
-
-    cross = _glyph_function(markers.Cross)
-
-    diamond = _glyph_function(markers.Diamond)
-
-    diamond_cross = _glyph_function(markers.DiamondCross)
-
-    hbar = _glyph_function(glyphs.HBar)
-
-    ellipse = _glyph_function(glyphs.Ellipse)
-
-    image = _glyph_function(glyphs.Image)
-
-    image_rgba = _glyph_function(glyphs.ImageRGBA)
-
-    image_url = _glyph_function(glyphs.ImageURL)
-
-    inverted_triangle = _glyph_function(markers.InvertedTriangle)
-
-    line = _glyph_function(glyphs.Line)
-
-    multi_line = _glyph_function(glyphs.MultiLine)
-
-    oval = _glyph_function(glyphs.Oval)
-
-    patch = _glyph_function(glyphs.Patch)
-
-    patches = _glyph_function(glyphs.Patches)
-
-    quad = _glyph_function(glyphs.Quad)
-
-    quadratic = _glyph_function(glyphs.Quadratic)
-
-    ray = _glyph_function(glyphs.Ray)
-
-    rect = _glyph_function(glyphs.Rect)
-
-    segment = _glyph_function(glyphs.Segment)
-
-    square = _glyph_function(markers.Square)
-
-    square_cross = _glyph_function(markers.SquareCross)
-
-    square_x = _glyph_function(markers.SquareX)
-
-    text = _glyph_function(glyphs.Text)
-
-    triangle = _glyph_function(markers.Triangle)
-
-    vbar = _glyph_function(glyphs.VBar)
-
-    wedge = _glyph_function(glyphs.Wedge)
-
-    x = _glyph_function(markers.X)
-
-def gmap(google_api_key, map_options, **kwargs):
-    ''' Create a new :class:`~bokeh.plotting.gmap.GMap` for plotting.
-
-    In addition to the standard :class:`~bokeh.plotting.gmap.GMap`
-    property values (e.g. ``plot_width`` or ``sizing_mode``) the following
-    additional options can be passed as well:
-
-    .. bokeh-options:: GMapFigureOptions
-        :module: bokeh.plotting.gmap
-
-    Returns:
-       GMap
-
-    '''
-
-    return GMap(google_api_key, map_options, **kwargs)
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

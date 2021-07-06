@@ -1,6 +1,6 @@
 .. _userguide_interaction:
 
-Adding Interactions
+Making Interactions
 ===================
 
 .. toctree::
@@ -15,7 +15,7 @@ Adding Interactions
     highlighting when making selections.
 
 :ref:`userguide_interaction_legends`
-    Bokeh ``Legends`` can be configure to allow for easily hiding or muting
+    Bokeh ``Legends`` can be configured to allow for easily hiding or muting
     corresponding glyphs.
 
 :ref:`userguide_interaction_widgets`

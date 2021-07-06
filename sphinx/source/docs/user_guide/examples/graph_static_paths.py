@@ -1,9 +1,9 @@
 import math
 
-from bokeh.io import show, output_file
-from bokeh.plotting import figure
-from bokeh.models import GraphRenderer, StaticLayoutProvider, Oval
+from bokeh.io import output_file, show
+from bokeh.models import Ellipse, GraphRenderer, StaticLayoutProvider
 from bokeh.palettes import Spectral8
+from bokeh.plotting import figure
 
 N = 8
 node_indices = list(range(N))
@@ -13,10 +13,9 @@ plot = figure(title="Graph Layout Demonstration", x_range=(-1.1,1.1), y_range=(-
 
 graph = GraphRenderer()
 
-graph.node_renderer.data_source.data = dict(
-    index=node_indices,
-    fill_color=Spectral8)
-graph.node_renderer.glyph = Oval(height=0.1, width=0.2, fill_color="fill_color")
+graph.node_renderer.data_source.add(node_indices, 'index')
+graph.node_renderer.data_source.add(Spectral8, 'color')
+graph.node_renderer.glyph = Ellipse(height=0.1, width=0.2, fill_color="color")
 
 graph.edge_renderer.data_source.data = dict(
     start=[0]*N,

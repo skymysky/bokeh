@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a base class for Bokeh Application handler classes.
 
 When a Bokeh server session is initiated, the Bokeh server asks the Application
@@ -27,9 +33,40 @@ based off information in some database:
             return doc
 
 '''
-from __future__ import absolute_import, print_function
 
-class Handler(object):
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+
+
+
+# Standard library imports
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+import os
+import sys
+import traceback
+
+__all__ = (
+    'Handler',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class Handler:
     ''' Provide a mechanism for Bokeh applications to build up new Bokeh
     Documents.
 
@@ -42,26 +79,30 @@ class Handler(object):
         self._error_detail = None
         self._static = None
 
-    def url_path(self):
-        ''' Returs a default URL path, if applicable.
+    # Properties --------------------------------------------------------------
 
-        Handlers subclasses may optionally implement this method, to inform
-        the Bokeh application what URL it should be installed at.
-
-        If multiple handlers specify ``url_path`` the Application will use the
-        value from the first handler in its list of handlers.
+    @property
+    def error(self):
+        ''' If the handler fails, may contain a related error message.
 
         '''
-        return None
+        return self._error
 
-    def static_path(self):
-        ''' Return a path to app-specific static resources, if applicable.
+    @property
+    def error_detail(self):
+        ''' If the handler fails, may contain a traceback or other details.
 
         '''
-        if self.failed:
-            return None
-        else:
-            return self._static
+        return self._error_detail
+
+    @property
+    def failed(self):
+        ''' ``True`` if the handler failed to modify the doc
+
+        '''
+        return self._failed
+
+    # Public methods ----------------------------------------------------------
 
     def modify_document(self, doc):
         ''' Modify an application document in a specified manner.
@@ -83,27 +124,6 @@ class Handler(object):
 
         '''
         raise NotImplementedError("implement modify_document()")
-
-    @property
-    def failed(self):
-        ''' ``True`` if the handler failed to modify the doc
-
-        '''
-        return self._failed
-
-    @property
-    def error(self):
-        ''' If the handler fails, may contain a related error message.
-
-        '''
-        return self._error
-
-    @property
-    def error_detail(self):
-        ''' If the handler fails, may contain a traceback or other details.
-
-        '''
-        return self._error_detail
 
     def on_server_loaded(self, server_context):
         ''' Execute code when the server is first started.
@@ -135,7 +155,7 @@ class Handler(object):
         '''
         pass
 
-    def on_session_created(self, session_context):
+    async def on_session_created(self, session_context):
         ''' Execute code when a new session is created.
 
         Subclasses may implement this method to provide for any per-session
@@ -148,7 +168,7 @@ class Handler(object):
         '''
         pass
 
-    def on_session_destroyed(self, session_context):
+    async def on_session_destroyed(self, session_context):
         ''' Execute code when a session is destroyed.
 
         Subclasses may implement this method to provide for any per-session
@@ -159,3 +179,58 @@ class Handler(object):
 
         '''
         pass
+
+    def process_request(self, request):
+        ''' Processes incoming HTTP request returning a dictionary of
+        additional data to add to the session_context.
+
+        Args:
+            request: HTTP request
+
+        Returns:
+            A dictionary of JSON serializable data to be included on
+            the session context.
+        '''
+        return {}
+
+    def static_path(self):
+        ''' Return a path to app-specific static resources, if applicable.
+
+        '''
+        if self.failed:
+            return None
+        else:
+            return self._static
+
+    def url_path(self):
+        ''' Returns a default URL path, if applicable.
+
+        Handlers subclasses may optionally implement this method, to inform
+        the Bokeh application what URL it should be installed at.
+
+        If multiple handlers specify ``url_path`` the Application will use the
+        value from the first handler in its list of handlers.
+
+        '''
+        return None
+
+
+def handle_exception(handler, e):
+    ''' Record an exception and details on a Handler.
+
+    '''
+    handler._failed = True
+    handler._error_detail = traceback.format_exc()
+
+    _exc_type, _exc_value, exc_traceback = sys.exc_info()
+    filename, line_number, func, txt = traceback.extract_tb(exc_traceback)[-1]
+
+    handler._error = "%s\nFile \"%s\", line %d, in %s:\n%s" % (str(e), os.path.basename(filename), line_number, func, txt)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

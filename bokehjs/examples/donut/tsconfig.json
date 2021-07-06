@@ -1,7 +1,4 @@
 {
   "extends": "../tsconfig.json",
-  "files": [
-    "../../src/coffee/api/typings.d.ts",
-    "donut.ts"
-  ]
+  "files": ["./donut.ts", "../bokehjs.d.ts"]
 }

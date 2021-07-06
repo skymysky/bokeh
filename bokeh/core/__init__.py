@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' The ``bokeh.core`` package provides modules that are useful for implementing
 Bokeh itself. Documentation for all of them can be accessed through the
 sidebar menu. Most of the modules here are probably not of general interest
@@ -12,7 +18,7 @@ custom extensions to Bokeh. These are listed below:
 
 :ref:`bokeh.core.properties`
     The fundamental building block of Bokeh apps and documents is the Bokeh
-    models, for instance plots, ranges, axes, etc. Bokeh models are comrpised
+    models, for instance plots, ranges, axes, etc. Bokeh models are comprised
     of properties, which are named attributes with specified types. Model
     properties can automatically validate and serialize themselves. This
     section describes all the property types that can be attached to Bokeh

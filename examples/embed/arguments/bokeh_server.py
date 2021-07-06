@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 '''This example demonstrates embedding an autoloaded Bokeh server
 into a simple Flask application, and passing arguments to Bokeh.
@@ -16,9 +15,8 @@ in this directory, and navigate to:
 import numpy as np
 
 from bokeh.io import curdoc
-from bokeh.layouts import row, widgetbox
-from bokeh.models import ColumnDataSource
-from bokeh.models.widgets import Slider, TextInput
+from bokeh.layouts import column, row
+from bokeh.models import ColumnDataSource, Slider, TextInput
 from bokeh.plotting import figure
 
 # Retrieving the arguments
@@ -29,14 +27,16 @@ try:
 except (ValueError, TypeError):
     batchid = 1
 
-dispatch = {1 : np.sin,
-            2 : np.cos,
-            3 : np.tan}
+func = {
+    1 : np.cos,
+    2 : np.sin,
+    3 : np.tan
+}[batchid]
 
 # Set up data
 N = 200
 x = np.linspace(0, 4*np.pi, N)
-y = dispatch[batchid](x)
+y = func(x)
 source = ColumnDataSource(data=dict(x=x, y=y))
 
 # Set up plot
@@ -47,7 +47,7 @@ plot = figure(plot_height=400, plot_width=400, title="my wave",
 plot.line('x', 'y', source=source, line_width=3, line_alpha=0.6)
 
 # Set up widgets
-text = TextInput(title="title", value="Batch n°{}".format(batchid))
+text = TextInput(title="title", value=f"Batch n°{batchid}")
 offset = Slider(title="offset", value=0.0, start=-5.0, end=5.0, step=0.1)
 amplitude = Slider(title="amplitude", value=1.0, start=-5.0, end=5.0)
 phase = Slider(title="phase", value=0.0, start=0.0, end=2*np.pi)
@@ -69,7 +69,7 @@ def update_data(attrname, old, new):
 
     # Generate the new curve
     x = np.linspace(0, 4*np.pi, N)
-    y = a*np.sin(k*x + w) + b
+    y = a*func(k*x + w) + b
 
     source.data = dict(x=x, y=y)
 
@@ -77,6 +77,6 @@ for w in [offset, amplitude, phase, freq]:
     w.on_change('value', update_data)
 
 # Set up layouts and add to document
-inputs = widgetbox(text, offset, amplitude, phase, freq)
+inputs = column(text, offset, amplitude, phase, freq)
 
 curdoc().add_root(row(inputs, plot, width=800))

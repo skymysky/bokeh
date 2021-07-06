@@ -1,18 +1,78 @@
-''' Models for mapping values from one range or space to another.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
+''' Models for mapping values from one range or space to another in the client.
+
+Mappers (as opposed to scales) are not presumed to be invertible.
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import warnings
 
+# Bokeh imports
 from .. import palettes
-from ..core.has_props import abstract
-from ..core.properties import Color, Either, Enum, Float, Int, Seq, String, Tuple
 from ..core.enums import Palette
+from ..core.has_props import abstract
+from ..core.properties import (
+    Color,
+    Either,
+    Enum,
+    Float,
+    HatchPatternType,
+    Instance,
+    Int,
+    List,
+    MarkerType,
+    Seq,
+    String,
+    Tuple,
+)
 from .transforms import Transform
 
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Mapper',
+    'ColorMapper',
+    'CategoricalMapper',
+    'CategoricalColorMapper',
+    'CategoricalMarkerMapper',
+    'CategoricalPatternMapper',
+    'ContinuousColorMapper',
+    'LinearColorMapper',
+    'LogColorMapper',
+    'EqHistColorMapper'
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
 @abstract
-class ColorMapper(Transform):
+class Mapper(Transform):
+    ''' Base class for mappers.
+
+    '''
+    pass
+
+@abstract
+class ColorMapper(Mapper):
     ''' Base class for color mapper types.
 
     '''
@@ -25,23 +85,22 @@ class ColorMapper(Transform):
     """).accepts(Enum(Palette), lambda pal: getattr(palettes, pal))
 
     nan_color = Color(default="gray", help="""
-    Color to be used if data is NaN. Default: 'gray'
+    Color to be used if data is NaN or otherwise not mappable. (Default: 'gray')
     """)
 
     def __init__(self, palette=None, **kwargs):
         if palette is not None:
             kwargs['palette'] = palette
-        super(ColorMapper, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
-
-class CategoricalColorMapper(ColorMapper):
-    ''' Map categories to colors. Values that are passed to
-    this mapper that aren't in factors will be assigned the nan_color.
+@abstract
+class CategoricalMapper(Mapper):
+    ''' Base class for mappers that map categorical factors to other values.
 
     '''
 
     factors = Either(Seq(String), Seq(Tuple(String, String)), Seq(Tuple(String, String, String)), default=None, help="""
-    A sequence of factors / categories that map to the color palette. For
+    A sequence of factors / categories that map to the some target range. For
     example the following color mapper:
 
     .. code-block:: python
@@ -52,7 +111,7 @@ class CategoricalColorMapper(ColorMapper):
     """)
 
     start = Int(default=0, help="""
-    A start index to "slice" data factors with before color mapping.
+    A start index to "slice" data factors with before mapping.
 
     For example, if the data to color map consists of 2-level factors such
     as ``["2016", "sales"]`` and ``["2016", "marketing"]``, then setting
@@ -61,7 +120,7 @@ class CategoricalColorMapper(ColorMapper):
     """)
 
     end = Int(help="""
-    A start index to "slice" data factors with before color mapping.
+    A start index to "slice" data factors with before mapping.
 
     For example, if the data to color map consists of 2-level factors such
     as ``["2016", "sales"]`` and ``["2017", "marketing"]``, then setting
@@ -72,8 +131,17 @@ class CategoricalColorMapper(ColorMapper):
     factor will be used for color mapping.
     """)
 
+
+class CategoricalColorMapper(CategoricalMapper, ColorMapper):
+    ''' Map categorical factors to colors.
+
+    Values that are passed to this mapper that are not in the factors list
+    will be mapped to ``nan_color``.
+
+    '''
+
     def __init__(self, **kwargs):
-        super(ColorMapper, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         palette = self.palette
         factors = self.factors
         if palette is not None and factors is not None:
@@ -81,6 +149,45 @@ class CategoricalColorMapper(ColorMapper):
                 extra_factors = factors[len(palette):]
                 warnings.warn("Palette length does not match number of factors. %s will be assigned to `nan_color` %s" % (extra_factors, self.nan_color))
 
+class CategoricalMarkerMapper(CategoricalMapper):
+    ''' Map categorical factors to marker types.
+
+    Values that are passed to this mapper that are not in the factors list
+    will be mapped to ``default_value``.
+
+    .. note::
+        This mappers is primarily only useful with the ``Scatter`` marker
+        glyph that be parameterized by marker type.
+
+    '''
+
+    markers = Seq(MarkerType, help="""
+    A sequence of marker types to use as the target for mapping.
+    """)
+
+    default_value = MarkerType(default="circle", help="""
+    A marker type to use in case an unrecognized factor is passed in to be
+    mapped.
+    """)
+
+class CategoricalPatternMapper(CategoricalMapper):
+    ''' Map categorical factors to hatch fill patterns.
+
+    Values that are passed to this mapper that are not in the factors list
+    will be mapped to ``default_value``.
+
+    Added in version 1.1.1
+
+    '''
+
+    patterns = Seq(HatchPatternType, help="""
+    A sequence of marker types to use as the target for mapping.
+    """)
+
+    default_value = HatchPatternType(default=" ", help="""
+    A hatch pattern to use in case an unrecognized factor is passed in to be
+    mapped.
+    """)
 
 @abstract
 class ContinuousColorMapper(ColorMapper):
@@ -88,14 +195,19 @@ class ContinuousColorMapper(ColorMapper):
 
     '''
 
-    low = Float(help="""
-    The minimum value of the range to map into the palette. Values below
-    this are clamped to ``low``.
+    domain = List(Tuple(Instance("bokeh.models.renderers.GlyphRenderer"), Either(String, List(String))), default=[], help="""
+    A collection of glyph renderers to pool data from for establishing data metrics.
+    If empty, mapped data will be used instead.
     """)
 
-    high = Float(help="""
+    low = Float(default=None, help="""
+    The minimum value of the range to map into the palette. Values below
+    this are clamped to ``low``. If ``None``, the value is inferred from data.
+    """)
+
+    high = Float(default=None, help="""
     The maximum value of the range to map into the palette. Values above
-    this are clamped to ``high``.
+    this are clamped to ``high``. If ``None``, the value is inferred from data.
     """)
 
     low_color = Color(default=None, help="""
@@ -137,7 +249,23 @@ class LogColorMapper(ContinuousColorMapper):
        20.09 >= x         : 'blue'    # values > high are clamped
 
     .. warning::
-        The LogColorMapper only works for images with scalar values that are
+        The ``LogColorMapper`` only works for images with scalar values that are
         non-negative.
 
     '''
+
+class EqHistColorMapper(ContinuousColorMapper):
+    bins = Int(default=256*256, help="Number of histogram bins")
+
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

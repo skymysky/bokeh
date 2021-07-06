@@ -1,13 +1,54 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Subcommands for the Bokeh command class
 
 '''
 
-def _collect():
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+from typing import List, Type
+
+# Bokeh imports
+from ..subcommand import Subcommand
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'all',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+def _collect() -> List[Type[Subcommand]]:
     from importlib import import_module
     from os import listdir
     from os.path import dirname
-    from ..subcommand import Subcommand
-
+    # reference type by module as fully
     results = []
 
     for file in listdir(dirname(__file__)):
@@ -21,12 +62,16 @@ def _collect():
         for name in dir(mod):
             attr = getattr(mod, name)
             if isinstance(attr, type) and issubclass(attr, Subcommand):
-                if not hasattr(attr, 'name'): continue # excludes abstract bases
+                if not getattr(attr, 'name', None): continue  # instance attribute not defined on abstract base class
                 results.append(attr)
 
     results = sorted(results, key=lambda attr: attr.name)
 
     return results
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
 
 all = _collect()
 

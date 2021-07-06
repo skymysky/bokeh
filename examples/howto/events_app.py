@@ -6,11 +6,11 @@ with corresponding Python event callbacks.
 
 import numpy as np
 
-from bokeh.io import curdoc
-from bokeh.plotting import figure
 from bokeh import events
-from bokeh.models import CustomJS, Div, Button
+from bokeh.io import curdoc
 from bokeh.layouts import column, row
+from bokeh.models import Button, CustomJS, Div
+from bokeh.plotting import figure
 
 
 def display_event(div, attributes=[]):
@@ -18,20 +18,20 @@ def display_event(div, attributes=[]):
     Function to build a suitable CustomJS to display the current event
     in the div model.
     """
-    style = 'float:left;clear:left;font_size=0.5pt'
+    style = 'float: left; clear: left; font-size: 13px'
     return CustomJS(args=dict(div=div), code="""
-        var attrs = %s;
-        var args = [];
-        for (var i=0; i<attrs.length; i++ ) {
-            val = JSON.stringify(cb_obj[attrs[i]], function(key, val) {
-                return val.toFixed ? Number(val.toFixed(2)) : val;
-            })
+        const {to_string} = Bokeh.require("core/util/pretty")
+        const attrs = %s;
+        const args = [];
+        for (let i = 0; i<attrs.length; i++ ) {
+            const val = to_string(cb_obj[attrs[i]], {precision: 2})
             args.push(attrs[i] + '=' + val)
         }
-        var line = "<span style=%r><b>" + cb_obj.event_name + "</b>(" + args.join(", ") + ")</span>\\n";
-        var text = div.text.concat(line);
-        var lines = text.split("\\n")
-        if ( lines.length > 35 ) { lines.shift(); }
+        const line = "<span style=%r><b>" + cb_obj.event_name + "</b>(" + args.join(", ") + ")</span>\\n";
+        const text = div.text.concat(line);
+        const lines = text.split("\\n")
+        if (lines.length > 35)
+            lines.shift();
         div.text = lines.join("\\n");
     """ % (attributes, style))
 
@@ -43,7 +43,8 @@ def print_event(attributes=[]):
         cls_name = event.__class__.__name__
         attrs = ', '.join(['{attr}={val}'.format(attr=attr, val=event.__dict__[attr])
                        for attr in attributes])
-        print('{cls_name}({attrs})'.format(cls_name=cls_name, attrs=attrs))
+        print(f"{cls_name}({attrs})")
+
     return python_callback
 
 # Follows the color_scatter gallery example
@@ -65,7 +66,7 @@ p.scatter(x, y, radius=radii,
 # Add a div to display events and a button to trigger button click events
 
 div = Div(width=1000)
-button = Button(label="Button", button_type="success")
+button = Button(label="Button", button_type="success", width=300)
 layout = column(button, row(p, div))
 
 

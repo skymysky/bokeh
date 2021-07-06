@@ -1,8 +1,7 @@
 import numpy as np
 
-from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid
-from bokeh.models.glyphs import VBar
 from bokeh.io import curdoc, show
+from bokeh.models import ColumnDataSource, Grid, LinearAxis, Plot, VBar
 
 N = 9
 x = np.linspace(-2, 2, N)
@@ -10,12 +9,9 @@ y = x**2
 
 source = ColumnDataSource(dict(x=x,top=y,))
 
-xdr = DataRange1d()
-ydr = DataRange1d()
-
 plot = Plot(
-    title=None, x_range=xdr, y_range=ydr, plot_width=300, plot_height=300,
-    h_symmetry=False, v_symmetry=False, min_border=0, toolbar_location=None)
+    title=None, plot_width=300, plot_height=300,
+    min_border=0, toolbar_location=None)
 
 glyph = VBar(x="x", top="top", bottom=0, width=0.5, fill_color="#b3de69")
 plot.add_glyph(source, glyph)

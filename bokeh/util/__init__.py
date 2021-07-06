@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a collection of general utilities useful for implementing Bokeh
 functionality.
 
@@ -40,12 +46,18 @@ functionality.
 
 .. automodule:: bokeh.util.deprecation
 
-.. _bokeh.util.future:
+.. _bokeh.util.functions:
 
-``bokeh.util.future``
----------------------
+``bokeh.util.functions``
+------------------------
 
-.. automodule:: bokeh.util.future
+.. automodule:: bokeh.util.functions
+  :members:
+
+``bokeh.util.hex``
+------------------
+
+.. automodule:: bokeh.util.hex
   :members:
 
 .. _bokeh.util.logconfig:
@@ -72,22 +84,6 @@ functionality.
 .. automodule:: bokeh.util.paths
   :members:
 
-.. _bokeh.util.platform:
-
-``bokeh.util.platform``
------------------------
-
-.. automodule:: bokeh.util.platform
-  :members:
-
-.. _bokeh.util.plot_utils:
-
-``bokeh.util.plot_utils``
--------------------------
-
-.. automodule:: bokeh.util.plot_utils
-  :members:
-
 .. _bokeh.util.serialization:
 
 ``bokeh.util.serialization``
@@ -96,12 +92,12 @@ functionality.
 .. automodule:: bokeh.util.serialization
   :members:
 
-.. _bokeh.util.session_id:
+.. _bokeh.util.token:
 
-``bokeh.util.session_id``
+``bokeh.util.token``
 -------------------------
 
-.. automodule:: bokeh.util.session_id
+.. automodule:: bokeh.util.token
   :members:
 
 .. _bokeh.util.string:
@@ -112,20 +108,20 @@ functionality.
 .. automodule:: bokeh.util.string
   :members:
 
-.. _bokeh.util.testing:
-
-``bokeh.util.testing``
-----------------------
-
-.. automodule:: bokeh.util.testing
-  :members:
-
 .. _bokeh.util.tornado:
 
 ``bokeh.util.tornado``
 ----------------------
 
 .. automodule:: bokeh.util.tornado
+  :members:
+
+  .. _bokeh.util.terminal:
+
+``bokeh.util.terminal``
+-----------------------
+
+.. automodule:: bokeh.util.terminal
   :members:
 
 .. _bokeh.util.version:

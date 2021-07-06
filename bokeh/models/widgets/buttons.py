@@ -1,16 +1,56 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Various kinds of button widgets.
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from ...core.enums import ButtonType
-from ...core.has_props import abstract, HasProps
-from ...core.properties import Bool, Enum, Instance, Int, List, Override, String, Tuple
-
+from ...core.has_props import HasProps, abstract
+from ...core.properties import (
+    Bool,
+    Either,
+    Enum,
+    Instance,
+    List,
+    Override,
+    String,
+    Tuple,
+)
+from ...events import ButtonClick, MenuItemClick
 from ..callbacks import Callback
-
 from .icons import AbstractIcon
 from .widget import Widget
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'AbstractButton',
+    'Button',
+    'ButtonLike',
+    'Dropdown',
+    'Toggle',
+)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 @abstract
 class ButtonLike(HasProps):
@@ -28,7 +68,7 @@ class AbstractButton(Widget, ButtonLike):
 
     '''
 
-    label = String("Button", help="""
+    label = String("", help="""
     The text label for the button to display.
     """)
 
@@ -36,19 +76,16 @@ class AbstractButton(Widget, ButtonLike):
     An optional image appearing to the left of button's text.
     """)
 
-    callback = Instance(Callback, help="""
-    A callback to run in the browser whenever the button is activated.
-    """)
-
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class Button(AbstractButton):
     ''' A click button.
 
     '''
 
-    clicks = Int(0, help="""
-    A private property used to trigger ``on_click`` event handler.
-    """)
+    label = Override(default="Button")
 
     def on_click(self, handler):
         ''' Set up a handler for button clicks.
@@ -60,12 +97,11 @@ class Button(AbstractButton):
             None
 
         '''
-        self.on_change('clicks', lambda attr, old, new: handler())
+        self.on_event(ButtonClick, handler)
 
     def js_on_click(self, handler):
         ''' Set up a JavaScript handler for button clicks. '''
-        self.js_on_change('clicks', handler)
-
+        self.js_on_event(ButtonClick, handler)
 
 class Toggle(AbstractButton):
     ''' A two-state toggle button.
@@ -102,15 +138,10 @@ class Dropdown(AbstractButton):
 
     label = Override(default="Dropdown")
 
-    value = String(help="""
-    A private property used to trigger ``on_click`` event handler.
+    split = Bool(default=False, help="""
     """)
 
-    default_value = String(help="""
-    The default value, otherwise the first item in ``menu`` will be used.
-    """)
-
-    menu = List(Tuple(String, String), help="""
+    menu = List(Either(String, Tuple(String, Either(String, Instance(Callback)))), help="""
     Button's dropdown menu consisting of entries containing item's text and
     value name. Use ``None`` as a menu separator.
     """)
@@ -125,8 +156,18 @@ class Dropdown(AbstractButton):
             None
 
         '''
-        self.on_change('value', lambda attr, old, new: handler(new))
+        self.on_event(ButtonClick, handler)
+        self.on_event(MenuItemClick, handler)
 
     def js_on_click(self, handler):
         ''' Set up a JavaScript handler for button or menu item clicks. '''
-        self.js_on_change('value', handler)
+        self.js_on_event(ButtonClick, handler)
+        self.js_on_event(MenuItemClick, handler)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

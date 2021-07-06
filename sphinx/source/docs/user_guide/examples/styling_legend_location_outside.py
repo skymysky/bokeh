@@ -1,6 +1,7 @@
 import numpy as np
+
 from bokeh.models import Legend
-from bokeh.plotting import figure, show, output_file
+from bokeh.plotting import figure, output_file, show
 
 x = np.linspace(0, 4*np.pi, 100)
 y = np.sin(x)
@@ -21,7 +22,7 @@ legend = Legend(items=[
     ("sin(x)"   , [r0, r1]),
     ("2*sin(x)" , [r2]),
     ("3*sin(x)" , [r3, r4]),
-], location=(0, -30))
+], location="center")
 
 p.add_layout(legend, 'right')
 

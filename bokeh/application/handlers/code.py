@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a Bokeh Application Handler to build up documents by compiling
 and executing Python source code.
 
@@ -18,26 +24,50 @@ applications that run off scripts and notebooks.
 
     server.start()
 
-
 '''
-from __future__ import absolute_import
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import os
 import sys
 
-from bokeh.io.doc import set_curdoc, curdoc
-
+# Bokeh imports
+from ...io.doc import curdoc, set_curdoc
 from .code_runner import CodeRunner
 from .handler import Handler
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'CodeHandler',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class CodeHandler(Handler):
     ''' Run source code which modifies a Document
 
     '''
 
+    # These functions, if present in the supplied code, will be monkey patched
+    # to be no-ops, with a warning.
     _io_functions = ['output_notebook', 'output_file', 'show', 'save', 'reset_output']
 
     def __init__(self, *args, **kwargs):
@@ -52,7 +82,7 @@ class CodeHandler(Handler):
                 available as ``sys.argv`` when the code executes
 
         '''
-        super(CodeHandler, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if 'source' not in kwargs:
             raise ValueError('Must pass source to CodeHandler')
@@ -63,31 +93,59 @@ class CodeHandler(Handler):
         filename = kwargs['filename']
 
         argv = kwargs.get('argv', [])
+        package = kwargs.get('package', False)
 
-        self._runner = CodeRunner(source, filename, argv)
+        self._runner = CodeRunner(source, filename, argv, package=package)
 
         self._loggers = {}
         for f in CodeHandler._io_functions:
             self._loggers[f] = self._make_io_logger(f)
 
-    def url_path(self):
-        ''' The last path component for the basename of the configured filename.
+    # Properties --------------------------------------------------------------
+
+    @property
+    def error(self):
+        ''' If the handler fails, may contain a related error message.
 
         '''
-        if self.failed:
-            return None
-        else:
-            # TODO should fix invalid URL characters
-            return '/' + os.path.splitext(os.path.basename(self._runner.path))[0]
+        return self._runner.error
+
+    @property
+    def error_detail(self):
+        ''' If the handler fails, may contain a traceback or other details.
+
+        '''
+        return self._runner.error_detail
+
+    @property
+    def failed(self):
+        ''' ``True`` if the handler failed to modify the doc
+
+        '''
+        return self._runner.failed
+
+    @property
+    def safe_to_fork(self):
+        ''' Whether it is still safe for the Bokeh server to fork new workers.
+
+        ``False`` if the code has already been executed.
+
+        '''
+        return not self._runner.ran
+
+    # Public methods ----------------------------------------------------------
 
     def modify_document(self, doc):
         '''
 
         '''
-        if self.failed:
-            return
 
         module = self._runner.new_module()
+
+        # If no module was returned it means the code runner has some permanent
+        # unfixable problem, e.g. the configured source code has a syntax error
+        if module is None:
+            return
 
         # One reason modules are stored is to prevent the module
         # from being gc'd before the document is. A symptom of a
@@ -112,7 +170,19 @@ class CodeHandler(Handler):
             self._unmonkeypatch_io(old_io)
             set_curdoc(old_doc)
 
-    # subclassess must define self._logger_text
+    def url_path(self):
+        ''' The last path component for the basename of the configured filename.
+
+        '''
+        if self.failed:
+            return None
+        else:
+            # TODO should fix invalid URL characters
+            return '/' + os.path.splitext(os.path.basename(self._runner.path))[0]
+
+    # Private methods ---------------------------------------------------------
+
+    # subclasses must define self._logger_text
     def _make_io_logger(self, name):
         def logger(*args, **kwargs):
             log.info(self._logger_text , self._runner.path, name)
@@ -135,32 +205,10 @@ class CodeHandler(Handler):
         for f in old:
             setattr(io, f, old[f])
 
-    @property
-    def failed(self):
-        ''' ``True`` if the handler failed to modify the doc
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
 
-        '''
-        return self._runner.failed
-
-    @property
-    def error(self):
-        ''' If the handler fails, may contain a related error message.
-
-        '''
-        return self._runner.error
-
-    @property
-    def error_detail(self):
-        ''' If the handler fails, may contain a traceback or other details.
-
-        '''
-        return self._runner.error_detail
-
-    @property
-    def safe_to_fork(self):
-        ''' Whether it is still safe for the Bokeh server to fork new workers.
-
-        ``False`` if the code has already been executed.
-
-        '''
-        return not self._runner.ran
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

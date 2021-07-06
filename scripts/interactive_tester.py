@@ -1,13 +1,12 @@
-from __future__ import print_function
+# Standard library imports
 import argparse
 import importlib
+import json
 import os
-from shutil import rmtree
-from six.moves import input
 import sys
 import textwrap
 import time
-import json
+from shutil import rmtree
 
 # TODO:
 #       catch and log exceptions in examples files that fail to open
@@ -95,7 +94,7 @@ def get_session():
     try:
         with open(SESSION_FILE, 'r') as res_file:
             return json.load(res_file)
-    except IOError:
+    except OSError:
         return {}
 
 
@@ -154,7 +153,7 @@ def main(testing_ground=None, notebook_options=""):
                 if results.nolog:
                     # Don't display 'next file' message after opening final file in a dir
                     if index != len(TestFiles)-1:
-                        input("\nPress enter to open next file ")
+                        input("\nPress enter to open next file ")  # lgtm [py/use-of-input]
                 else:
                     ErrorReport = test_status()
                     if ErrorReport:
@@ -214,9 +213,9 @@ def test_status():
     status = input("Did the plot(s) display correctly? (y/n) ")
     while not status.startswith(('y', 'n')):
         print("")
-        status = input("Unexpected answer. Please type y or n. ")
+        status = input("Unexpected answer. Please type y or n. ")  # lgtm [py/use-of-input]
     if status.startswith('n'):
-        ErrorReport = input("Please describe the problem: ")
+        ErrorReport = input("Please describe the problem: ")  # lgtm [py/use-of-input]
         return ErrorReport
 
 

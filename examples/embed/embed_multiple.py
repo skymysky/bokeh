@@ -1,4 +1,4 @@
-import io
+from collections import OrderedDict
 
 from jinja2 import Template
 
@@ -38,7 +38,7 @@ p3 = figure(x_range=xr2, y_range=yr2, tools=TOOLS, plot_width=300, plot_height=3
 p3.scatter(x3, y3, size=12, color="green", alpha=0.5)
 
 # plots can be a single Bokeh model, a list/tuple, or even a dictionary
-plots = {'Red': p1, 'Blue': p2, 'Green': p3}
+plots = OrderedDict([('Red', p1), ('Blue', p2), ('Green', p3)])
 
 script, div = components(plots)
 
@@ -47,38 +47,34 @@ template = Template('''<!DOCTYPE html>
     <head>
         <meta charset="utf-8">
         <title>Bokeh Scatter Plots</title>
-        {{ js_resources }}
-        {{ css_resources }}
+        {{ resources }}
         {{ script }}
         <style>
             .embed-wrapper {
-                width: 50%;
-                height: 400px;
-                margin: auto;
+                display: flex;
+                justify-content: space-evenly;
             }
         </style>
     </head>
     <body>
-        {% for key in div.keys() %}
-            <div class="embed-wrapper">
-            {{ div[key] }}
-            </div>
-        {% endfor %}
+        <div class="embed-wrapper">
+            {% for key in div.keys() %}
+                {{ div[key] }}
+            {% endfor %}
+        </div>
     </body>
 </html>
 ''')
 
-js_resources = INLINE.render_js()
-css_resources = INLINE.render_css()
+resources = INLINE.render()
 
 filename = 'embed_multiple.html'
 
-html = template.render(js_resources=js_resources,
-                       css_resources=css_resources,
+html = template.render(resources=resources,
                        script=script,
                        div=div)
 
-with io.open(filename, mode='w', encoding='utf-8') as f:
+with open(filename, mode="w", encoding="utf-8") as f:
     f.write(html)
 
 view(filename)

@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,20 +11,12 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
-
-# Standard library imports
-
-# External imports
 
 # Bokeh imports
 from ..util.sampledata import package_csv
@@ -39,11 +30,11 @@ __all__ = (
 )
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -54,9 +45,14 @@ def _read_data():
     '''
 
     '''
-    data = package_csv('commits', 'commits.txt.gz', parse_dates=True, header=None, names=['day', 'datetime'], index_col='datetime')
-    data = data.tz_localize('GMT').tz_convert('US/Central')
+    from ..util.dependencies import import_required
+    module = 'commits'
+    pd = import_required('pandas', '%s sample data requires Pandas (http://pandas.pydata.org) to be installed' % module)
+
+    data = package_csv(module, 'commits.txt.gz', parse_dates=True, header=None, names=['day', 'datetime'], index_col='datetime')
+    data.index = pd.to_datetime(data.index, utc=True,).astype('datetime64[ns]').tz_localize('utc').tz_convert('US/Central')
     data['time'] = data.index.time
+
     return data
 
 #-----------------------------------------------------------------------------

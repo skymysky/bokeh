@@ -1,26 +1,16 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import print_function
-
-from math import sin, cos, atan2, sqrt, radians
+from math import atan2, cos, radians, sin, sqrt
 
 import numpy as np
 import scipy.ndimage as im
 
 from bokeh.document import Document
 from bokeh.embed import file_html
+from bokeh.models import (Column, ColumnDataSource, GMapOptions, GMapPlot,
+                          Grid, Label, Line, LinearAxis, PanTool, Patches,
+                          Plot, Range1d, ResetTool, WheelZoomTool,)
 from bokeh.resources import INLINE
-from bokeh.util.browser import view
-
-from bokeh.models.glyphs import Line, Patches
-from bokeh.models.layouts import Column
-from bokeh.models import (
-    Plot, GMapPlot, GMapOptions,
-    DataRange1d, ColumnDataSource,
-    LinearAxis, Grid, Label,
-    PanTool, WheelZoomTool, ResetTool)
-
 from bokeh.sampledata.mtb import obiszow_mtb_xcm
+from bokeh.util.browser import view
 
 
 def haversin(theta):
@@ -47,7 +37,7 @@ def prep_data(dataset):
     df = dataset.copy()
 
     latlon = list(zip(df.lat, df.lon))
-    dist = np.array([distance(latlon[i + 1], latlon[i]) for i in range(len((latlon[:-1])))])
+    dist = np.array([distance(latlon[i + 1], latlon[i]) for i in range(len(latlon[:-1]))])
 
     df["dist"] = np.concatenate(([0], np.cumsum(dist)))
 
@@ -82,8 +72,8 @@ def trail_map(data):
     map_options = GMapOptions(lng=lon, lat=lat, zoom=13)
     plot = GMapPlot(plot_width=800, plot_height=800, map_options=map_options, api_key=API_KEY)
     plot.title.text = "%s - Trail Map" % name
-    plot.x_range = DataRange1d()
-    plot.y_range = DataRange1d()
+    plot.x_range = Range1d()
+    plot.y_range = Range1d()
     plot.add_tools(PanTool(), WheelZoomTool(), ResetTool())
 
     line_source = ColumnDataSource(dict(x=data.lon, y=data.lat, dist=data.dist))
@@ -101,8 +91,7 @@ def trail_map(data):
 def altitude_profile(data):
     plot = Plot(plot_width=800, plot_height=400)
     plot.title.text = "%s - Altitude Profile" % name
-    plot.x_range = DataRange1d()
-    plot.y_range = DataRange1d(range_padding=0)
+    plot.y_range.range_padding = 0
 
     xaxis = LinearAxis(axis_label="Distance (km)")
     plot.add_layout(xaxis, 'below')

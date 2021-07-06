@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,26 +11,19 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
 # Standard library imports
-import io
 from os.path import abspath
 from warnings import warn
 
-# External imports
-
 # Bokeh imports
-from ..util.string import decode_utf8
+from ..settings import settings
 from .state import curstate
 from .util import default_filename
 
@@ -41,12 +33,15 @@ from .util import default_filename
 
 DEFAULT_TITLE = "Bokeh Plot"
 
+__all__ = (
+    'save',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-def save(obj, filename=None, resources=None, title=None, state=None, **kwargs):
+def save(obj, filename=None, resources=None, title=None, template=None, state=None, **kwargs):
     ''' Save an HTML file with the data for the current document.
 
     Will fall back to the default output state (or an explicitly provided
@@ -69,7 +64,11 @@ def save(obj, filename=None, resources=None, title=None, state=None, **kwargs):
             If None, use the default state title value, if there is one.
             Otherwise, use "Bokeh Plot"
 
-         state (State, optional) :
+        template (Template, optional) : HTML document template (default: FILE)
+            A Jinja2 Template, see bokeh.core.templates.FILE for the required template
+            parameters
+
+        state (State, optional) :
             A :class:`State` object. If None, then the current default
             implicit state is used. (default: None).
 
@@ -81,12 +80,14 @@ def save(obj, filename=None, resources=None, title=None, state=None, **kwargs):
     if state is None:
         state = curstate()
 
+    theme = state.document.theme
+
     filename, resources, title = _get_save_args(state, filename, resources, title)
-    _save_helper(obj, filename, resources, title)
+    _save_helper(obj, filename, resources, title, template, theme)
     return abspath(filename)
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -109,7 +110,7 @@ def _get_save_filename(state, filename):
     if filename is not None:
         return filename, False
 
-    if state.file:
+    if state.file and not settings.ignore_filename():
         return state.file['filename'], False
 
     return default_filename("html"), True
@@ -124,8 +125,8 @@ def _get_save_resources(state, resources, suppress_warning):
     if not suppress_warning:
         warn("save() called but no resources were supplied and output_file(...) was never called, defaulting to resources.CDN")
 
-    from ..resources import CDN
-    return CDN
+    from ..resources import Resources
+    return Resources(mode=settings.resources())
 
 def _get_save_title(state, title, suppress_warning):
     if title is not None:
@@ -139,15 +140,15 @@ def _get_save_title(state, title, suppress_warning):
 
     return DEFAULT_TITLE
 
-def _save_helper(obj, filename, resources, title):
+def _save_helper(obj, filename, resources, title, template, theme=None):
     '''
 
     '''
     from ..embed import file_html
-    html = file_html(obj, resources, title=title)
+    html = file_html(obj, resources, title=title, template=template, theme=theme)
 
-    with io.open(filename, mode="w", encoding="utf-8") as f:
-        f.write(decode_utf8(html))
+    with open(filename, mode="w", encoding="utf-8") as f:
+        f.write(html)
 
 #-----------------------------------------------------------------------------
 # Code

@@ -1,17 +1,11 @@
-from __future__ import print_function
+from numpy import cos, linspace, pi, sin
 
-from numpy import pi, sin, cos
-import numpy as np
-
-from bokeh.io import show, output_file
-from bokeh.models.glyphs import Line, Circle
-from bokeh.models import (
-    Plot, DataRange1d, LinearAxis, ColumnDataSource,
-    PanTool, WheelZoomTool, SaveTool, Legend,
-)
 from bokeh.core.enums import LegendLocation
+from bokeh.io import output_file, show
+from bokeh.models import (Circle, ColumnDataSource, DataRange1d, Legend, Line,
+                          LinearAxis, PanTool, Plot, SaveTool, WheelZoomTool,)
 
-x = np.linspace(-2*pi, 2*pi, 400)
+x = linspace(-2*pi, 2*pi, 400)
 y = sin(x)
 y2 = cos(x)
 
@@ -51,6 +45,7 @@ def add_legend(location, orientation, side):
         items=[("line", [line]), ("circle", [circle])],
         location=location, orientation=orientation,
         border_line_color="black",
+        title='Example Title'
     )
     plot.add_layout(legend, side)
 

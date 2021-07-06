@@ -1,13 +1,51 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' A guide renderer for displaying grid lines on Bokeh plots.
 
 '''
-from __future__ import absolute_import
 
-from ..core.properties import Auto, Either, Float, Include, Instance, Int, Override, String, Tuple
-from ..core.property_mixins import FillProps, LineProps
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ..core.properties import (
+    Auto,
+    Either,
+    Float,
+    Include,
+    Instance,
+    Int,
+    Override,
+    Seq,
+    Tuple,
+)
+from ..core.property_mixins import ScalarFillProps, ScalarHatchProps, ScalarLineProps
+from .axes import Axis
 from .renderers import GuideRenderer
-from .tickers import Ticker
+from .tickers import FixedTicker, Ticker
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Grid',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class Grid(GuideRenderer):
     ''' Display horizontal or vertical grid lines at locations
@@ -21,43 +59,35 @@ class Grid(GuideRenderer):
     """)
 
     bounds = Either(Auto, Tuple(Float, Float), help="""
-    Bounds for the rendered grid lines. If unset, the grid
-    lines will span the entire plot in the given dimension.
+    Bounds for the rendered grid lines. By default, a grid will look for a
+    corresponding axis to ask for bounds. If one cannot be found, the grid
+    will span the entire visible range.
     """)
 
-    # Note: we must allow the possibility of setting both
-    # range names be cause if a grid line is "traced" along
-    # a path, ranges in both dimensions will matter.
-
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen
-    locations when rendering a grid on the plot. If unset, use the
-    default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen
-    locations when rendering a grid on the plot. If unset, use the
-    default y-range.
+    axis = Instance(Axis, help="""
+    An Axis to delegate ticking to. If the ticker property is None, then the
+    Grid will use the ticker on the specified axis for computing where to draw
+    grid lines. Otherwise, it ticker is not None, it will take precedence over
+    any Axis.
     """)
 
     ticker = Instance(Ticker, help="""
-    The Ticker to use for computing locations for the Grid lines.
-    """)
+    A Ticker to use for computing locations for the Grid lines.
+    """).accepts(Seq(Float), lambda ticks: FixedTicker(ticks=ticks))
 
-    grid_props = Include(LineProps, help="""
+    grid_props = Include(ScalarLineProps, help="""
     The %s of the Grid lines.
     """)
 
     grid_line_color = Override(default='#e5e5e5')
 
-    minor_grid_props = Include(LineProps, help="""
+    minor_grid_props = Include(ScalarLineProps, help="""
     The %s of the minor Grid lines.
     """)
 
     minor_grid_line_color = Override(default=None)
 
-    band_props = Include(FillProps, help="""
+    band_fill_props = Include(ScalarFillProps, use_prefix="band", help="""
     The %s of alternating bands between Grid lines.
     """)
 
@@ -65,4 +95,20 @@ class Grid(GuideRenderer):
 
     band_fill_color = Override(default=None)
 
+    band_hatch_props = Include(ScalarHatchProps, use_prefix="band", help="""
+    The %s of alternating bands between Grid lines.
+    """)
+
     level = Override(default="underlay")
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

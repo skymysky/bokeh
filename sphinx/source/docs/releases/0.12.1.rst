@@ -1,8 +1,10 @@
-0.12.1 (Jul 2016)
-=================
+.. _release-0-12-1:
 
-Bokeh Version ``0.12.1`` is a minor, incremental update that adds a few new
-small features and fixes several bugs. Some of the highlights include:
+0.12.1
+======
+
+Bokeh Version ``0.12.1`` (Jul 2016) is a minor, incremental update that adds
+a few new small features and fixes several bugs. Some of the highlights include:
 
 * Add ``.patch`` method to ``ColumnDataSource`` for efficient partial updates.
 * Add ``.visible`` property to all glyphs for easy on/off capability.
@@ -15,8 +17,3 @@ small features and fixes several bugs. Some of the highlights include:
 * Fix a bug in the toolbar CSS, causing it to interfere with hit testing and selection.
 * Fix WebGL support for Safari, and WebGL bug affecting line thickness.
 * Fix intermittent issues with BokehJS loading in Jupyter notebooks.
-
-NOTE: the 0.12.x series is the last planned release series before a
-version 1.0 release. The focus of the 1.0 release will be implementing
-build automation to enforce API stability, and a very small number of
-high value features.

@@ -1,8 +1,10 @@
-0.12.3 (Oct 2016)
-=================
+.. _release-0-12-3:
 
-Bokeh Version ``0.12.3`` is a minor, incremental update that adds a few new
-small features and fixes several bugs. Some of the highlights include:
+0.12.3
+======
+
+Bokeh Version ``0.12.3`` (Oct 2016) is a minor, incremental update that adds
+a few new small features and fixes several bugs. Some of the highlights include:
 
 * BokehJS reduced in size by nearly twenty percent
 * New Categorical color mapper
@@ -11,13 +13,10 @@ small features and fixes several bugs. Some of the highlights include:
 * Auto-generate legends from data in a column
 * Many small bugfixes
 
-NOTE: the 0.12.x series is the last planned release series before a
-version 1.0 release. The focus of the 1.0 release will be implementing
-build automation to enforce API stability, and a very small number of
-high value features.
+.. _release-0-12-3-migration:
 
-Migration Guide
----------------
+`Migration Guide <releases.html#release-0-12-3-migration>`__
+------------------------------------------------------------
 
 As the project approaches a 1.0 release, it is necessary to make some changes
 to bring interfaces and functionality up to a point that can be maintained
@@ -27,7 +26,7 @@ period of deprecation.
 Specifying Font Sizes
 '''''''''''''''''''''
 
-Setting text font size properties directly as strings (e.g. ``font_size="10pt"``)
+Setting text font size properties directly as strings (e.g. ``font_size="13px"``)
 has been UN-DEPRECATED. This usage will continue to work, without any further
 deprecation warning. (https://github.com/bokeh/bokeh/pull/5274)
 

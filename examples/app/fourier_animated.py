@@ -18,14 +18,14 @@ in your browser.
 from collections import OrderedDict
 
 import numpy as np
-from numpy import pi
 
+from bokeh.driving import repeat
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models.sources import ColumnDataSource as CDS
+from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
-from bokeh.driving import repeat
 
+pi = np.pi
 N = 100
 newx = x = np.linspace(0, 2*pi, N)
 shift = 2.2
@@ -36,10 +36,10 @@ palette = ['#08519c', '#3182bd', '#6baed6', '#bdd7e7']
 
 def new_source():
     return dict(
-        curve=CDS(dict(x=[], base_x=[], y=[])),
-        lines=CDS(dict(line_x=[], line_y=[], radius_x=[], radius_y=[])),
-        circle_point=CDS(dict(x=[], y=[], r=[])),
-        circleds=CDS(dict(x=[], y=[]))
+        curve=ColumnDataSource(dict(x=[], base_x=[], y=[])),
+        lines=ColumnDataSource(dict(line_x=[], line_y=[], radius_x=[], radius_y=[])),
+        circle_point=ColumnDataSource(dict(x=[], y=[], r=[])),
+        circleds=ColumnDataSource(dict(x=[], y=[]))
     )
 
 def create_circle_glyphs(p, color, sources):
@@ -66,19 +66,19 @@ def create_plot(foos, title='', r = 1, y_range=None, period = pi/2, cfoos=None):
 
         if i==0:
             # compute the full fourier eq
-            full_y = sum([foo(x) for foo in foos])
+            full_y = sum(foo(x) for foo in foos)
             # replace the foo curve with the full fourier eq
-            sources['curve'] = CDS(dict(x=x, base_x=base_x, y=full_y))
+            sources['curve'] = ColumnDataSource(dict(x=x, base_x=base_x, y=full_y))
             # draw the line
             p.line('base_x','y', color="orange", line_width=2, source=sources['curve'])
 
         if i==len(foos)-1:
             # if it's the last foo let's draw a circle on the head of the curve
-            sources['floating_point'] = CDS({'x':[shift], 'y': [cy]})
+            sources['floating_point'] = ColumnDataSource({'x':[shift], 'y': [cy]})
             p.line('line_x', 'line_y', color=palette[i], line_width=2, source=sources['lines'])
             p.circle('x', 'y', size=10, line_color=palette[i], color=palette[i], source=sources['floating_point'])
 
-        # draw the circle, radius and circle point realted to foo domain
+        # draw the circle, radius and circle point related to foo domain
         create_circle_glyphs(p, palette[i], sources)
         _sources.append(sources)
 
@@ -112,7 +112,7 @@ def update_sources(sources, foos, newx, ind, cfoos):
                         compute_curve = i != 0)
 
         if i == 0:
-            full_y = sum([foo(newx) for foo in foos])
+            full_y = sum(foo(newx) for foo in foos)
             sources[i]['curve'].data = dict(x=newx, base_x=base_x, y=full_y)
 
         cp = sources[i]['circle_point'].data
@@ -138,13 +138,13 @@ def create_centric_plot(foos, title='', r = 1, y_range=(-2, 2), period = pi/2, c
         _sources.append(sources)
 
         if i:
-            legend = "4sin(%(c)sx)/%(c)spi" % {'c': i*2+1}
+            legend_label = "4sin(%(c)sx)/%(c)spi" % {'c': i*2+1}
         else:
-            legend = "4sin(x)/pi"
+            legend_label = "4sin(x)/pi"
 
         p.line('base_x','y', color=palette[i], line_width=2, source=sources['curve'])
         p.line('line_x', 'line_y', color=palette[i], line_width=2,
-                source=sources['lines'], legend=legend)
+                source=sources['lines'], legend_label=legend_label)
 
         create_circle_glyphs(p, palette[i], sources)
 

@@ -1,9 +1,9 @@
-from bokeh.io import output_file, show
-from bokeh.layouts import widgetbox
-from bokeh.models.widgets import Select
-
-output_file("select.html")
+from bokeh.io import show
+from bokeh.models import CustomJS, Select
 
 select = Select(title="Option:", value="foo", options=["foo", "bar", "baz", "quux"])
+select.js_on_change("value", CustomJS(code="""
+    console.log('select: value=' + this.value, this.toString())
+"""))
 
-show(widgetbox(select))
+show(select)

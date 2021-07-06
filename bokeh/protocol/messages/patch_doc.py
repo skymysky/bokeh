@@ -1,16 +1,48 @@
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 from json import loads
 
+# Bokeh imports
 from ...core.json_encoder import serialize_json
 from ...document.util import references_json
 from ..message import Message
-from . import register
 
-@register
-class patch_doc_1(Message):
-    ''' Define the ``PATCH-DOC`` message (revision 1) for sending Document
-    patch events between remote documents.
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'patch_doc',
+    'process_document_events',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class patch_doc(Message):
+    ''' Define the ``PATCH-DOC`` message for sending Document patch events
+    between remote documents.
 
     The ``content`` fragment of for this message is has the form:
 
@@ -24,10 +56,9 @@ class patch_doc_1(Message):
     '''
 
     msgtype  = 'PATCH-DOC'
-    revision = 1
 
     def __init__(self, header, metadata, content):
-        super(patch_doc_1, self).__init__(header, metadata, content)
+        super().__init__(header, metadata, content)
 
     @classmethod
     def create(cls, events, use_buffers=True, **metadata):
@@ -66,7 +97,7 @@ class patch_doc_1(Message):
         '''
 
         '''
-        doc.apply_json_patch(self.content, setter)
+        doc._with_self_as_curdoc(lambda: doc.apply_json_patch(self.content, setter))
 
 def process_document_events(events, use_buffers=True):
     ''' Create a JSON string describing a patch to be applied as well as
@@ -96,3 +127,11 @@ def process_document_events(events, use_buffers=True):
     }
 
     return serialize_json(json), buffers if use_buffers else []
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

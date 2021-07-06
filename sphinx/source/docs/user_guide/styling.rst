@@ -9,7 +9,7 @@ Using Palettes
 --------------
 
 Palettes are sequences (lists or tuples) of RGB(A) hex strings that define a
-colormap and be can set as the ``color`` attribute of many plot objects from
+colormap and can be set as the ``color`` attribute of many plot objects from
 ``bokeh.plotting``. Bokeh offers many of the standard Brewer palettes, which
 can be imported from the ``bokeh.palettes`` module. For example, importing
 “Spectral6” gives a six element list of RGB(A) hex strings from the Brewer
@@ -25,12 +25,35 @@ All of the standard palettes included in bokeh can be found at
 :ref:`bokeh.palettes`. Custom palettes can be made by creating sequences of
 RGB(A) hex strings.
 
+.. _userguide_styling_using_mappers:
+
+Using Mappers
+--------------
+
+Color Mappers allow you to encode some data sequence into a palette of colors based on the value in that sequence. The mappers are then set as the ``color`` attribute on marker objects. Bokeh includes several types of mappers to encode colors:
+
+* ``bokeh.transform.factor_cmap``: Maps colors to specific categorical elements see :ref:`userguide_categorical` for more detail.
+* ``bokeh.transform.linear_cmap``: Maps a range of numeric values across the available colors from high to low. For example, a range of `[0,99]` given the colors `['red', 'green', 'blue']` would be mapped as follows::
+
+        x < 0  : 'red'     # values < low are clamped
+    0 >= x < 33 : 'red'
+    33 >= x < 66 : 'green'
+    66 >= x < 99 : 'blue'
+    99 >= x      : 'blue'    # values > high are clamped
+
+* ``bokeh.transform.log_cmap``: Similar to ``linear_cmap`` but uses a natural log scale to map the colors.
+
+These mapper functions return a ``DataSpec`` property that can be passed to the color attribute of the glyph. The returned dataspec includes a ``bokeh.transform`` which can be accessed to use the mapper in another context such as to create a ``ColorBar`` as in the example below:
+
+.. bokeh-plot:: docs/user_guide/examples/styling_linear_mappers.py
+    :source-position: above
+
 .. _userguide_styling_visual_properties:
 
 Visual Properties
 -----------------
 
-In order to style the visual attributes of Bokeh plots, you first must
+In order to style the visual attributes of Bokeh plots, you need to
 know what the available properties are. The full :ref:`refguide` will
 list all the properties of every object individually, though there are three
 broad groups of properties that show up often. They are:
@@ -57,6 +80,11 @@ Fill Properties
 
 .. _userguide_styling_text_properties:
 
+Hatch Properties
+~~~~~~~~~~~~~~~~
+
+.. include:: ../includes/hatch_props.txt
+
 Text Properties
 ~~~~~~~~~~~~~~~
 
@@ -67,13 +95,13 @@ Text Properties
 Visible property
 ~~~~~~~~~~~~~~~~
 
-Glyph renderers, axes, grids, and annotations all have a visible property that can be used to turn them on
+Glyph renderers, axes, grids, and annotations all have a ``visible`` property that can be used to turn them on
 and off.
 
 .. bokeh-plot:: docs/user_guide/examples/styling_visible_property.py
     :source-position: above
 
-This can be particularly useful in interactive examples with bokeh server or CustomJS.
+This can be particularly useful in interactive examples with a Bokeh server or CustomJS.
 
 .. bokeh-plot:: docs/user_guide/examples/styling_visible_annotation_with_interaction.py
     :source-position: above
@@ -82,7 +110,7 @@ Specifying Colors
 ~~~~~~~~~~~~~~~~~
 
 Colors properties are used in many places in Bokeh, to specify the colors to
-use for lines, fills or text. Color values can be provided in any of the
+use for lines, fills, or text. Color values can be provided in any of the
 following ways:
 
 .. include:: ../includes/colors.txt
@@ -100,7 +128,7 @@ following ways:
 .. _GitHub: https://github.com/bokeh/bokeh/issues/2622
 
 Color alpha can be specified in multiple ways for the visual properties. This
-can be by specifying the alpha directly with ``line|fill_alpha``, or by
+can be done by specifying the alpha directly with ``line|fill_alpha``, or by
 providing the alpha through the RGBA 4-tuple for the ``line|fill_color``.
 
 Additionally, there is also the freedom to use a combination of the two, or no
@@ -125,9 +153,9 @@ Styling Arrow Annotations
 
 There are several `ArrowHead` subtypes that can be applied to Arrow
 annotations. Setting the `start` or `end` property to None will
-cause no arrow head to be applied at the specified arrow end. Double-sided
+cause no arrowhead to be applied at the specified arrow end. Double-sided
 arrows can be created by setting both `start` and `end` styles. Setting
-`visible` to false on an arrow will also make the corresponding arrow head
+`visible` to false on an arrow will also make the corresponding arrowhead
 invisible.
 
 .. bokeh-plot:: docs/user_guide/examples/styling_arrow_annotations.py
@@ -186,7 +214,7 @@ Plots
 |Plot| objects themselves have many visual characteristics that can be styled:
 the dimensions of the plot, backgrounds, borders, outlines, etc. This section
 describes how to change these attributes of a Bokeh plot. The example code
-primarily uses the |bokeh.plotting| interface to create plots, however the
+primarily uses the |bokeh.plotting| interface to create plots. However, the
 instructions apply regardless of how a Bokeh plot was created.
 
 .. _userguide_styling_plot_dimensions:
@@ -220,7 +248,6 @@ plot, so you may want to keep them. Plots will only resize down to a minimum of
 100px (height or width) to prevent problems in displaying your plot.
 
 .. _Bokeh GitHub repository: https://github.com/bokeh/bokeh
-.. _Bokeh mailing list: https://groups.google.com/a/anaconda.com/forum/#!forum/bokeh
 
 .. _userguide_styling_plot_title:
 
@@ -280,7 +307,7 @@ Outline
 ~~~~~~~
 
 The styling of the outline of the plotting area is controlled by a set of
-`Line Properties`_ on the |Plot|, that are prefixed with ``outline_``. For
+`Line Properties`_ on the |Plot|, which are prefixed with ``outline_``. For
 instance, to set the color of the outline, use ``outline_line_color``:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_plot_outline_line_color.py
@@ -330,7 +357,7 @@ of the |GlyphRenderer| either manually or by passing them to |add_glyph|.
 
 The plot below demonstrates how to set these attributes using the
 |bokeh.plotting| interface. Click or tap circles on the plot to see the
-effect on the selected and nonselected glyphs. To clear the selection
+effect on the selected and non-selected glyphs. To clear the selection
 and restore the original state, click anywhere in the plot *outside* of a
 circle.
 
@@ -338,7 +365,7 @@ circle.
     :source-position: above
 
 If you just need to set the color or alpha parameters of the selected or
-nonselected glyphs, this can be accomplished even more simply by providing
+non-selected glyphs, this can be accomplished even more easily by providing
 color and alpha arguments to the glyph function, prefixed by ``"selection_"``
 or ``"nonselection_"``. The plot below demonstrates this technique:
 
@@ -372,7 +399,7 @@ Hover Inspections
 ~~~~~~~~~~~~~~~~~
 
 Setting the highlight policy for glyphs that are hovered over is completely
-analogous to setting the ``selection_glyph`` or ``nonselection_glyph``, or
+analogous to setting the ``selection_glyph`` or ``nonselection_glyph`` or
 by passing color or alpha parameters prefixed with ``"hover_"``. The example
 below demonstrates the latter method:
 
@@ -388,19 +415,33 @@ below demonstrates the latter method:
 Tool Overlays
 -------------
 
-Some Bokeh tools also have configurable visual attributes. For instance the
+Some Bokeh tools also have configurable visual attributes. For instance, the
 various region selection tools and box zoom tool all have an ``overlay``
 whose line and fill properties may be set:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_tool_overlays.py
     :source-position: above
 
+
+.. _userguide_styling_toolbar_autohide:
+
+ToolBar Autohide
+----------------
+
+In addition to selecting the tools in toolbars, you can also control
+their appearance. The ``autohide`` attribute specifies that the toolbar is
+visible only when the mouse is inside the plot area, otherwise it is hidden.
+
+.. bokeh-plot:: docs/user_guide/examples/styling_toolbar_autohide.py
+    :source-position: above
+
+
 .. _userguide_styling_axes:
 
 Axes
 ----
 
-In this section you will learn how to change various visual properties
+In this section, you will learn how to change various visual properties
 of Bokeh plot axes.
 
 To set style attributes on Axis objects, use the |xaxis|, |yaxis|, and
@@ -412,7 +453,7 @@ To set style attributes on Axis objects, use the |xaxis|, |yaxis|, and
     [<bokeh.models.axes.LinearAxis at 0x106fa2390>]
 
 This returns a list of Axis objects (since there may be more than
-one). But note that, as convenience, these lists are *splattable*,
+one). But note that, as a convenience, these lists are *splattable*,
 meaning that you can set attributes directly on this result, and
 the attributes will be applied to all the axes in the list:
 
@@ -436,7 +477,7 @@ Labels
 
 The text of an overall label for an axis is controlled by the ``axis_label``
 property. Additionally, there are `Text Properties`_ prefixed with
-``axis_label_`` that control the visual appearance of the label. For instance
+``axis_label_`` that control the visual appearance of the label. For instance,
 to set the color of the label, set ``axis_label_text_color``. Finally, to
 change the distance between the axis label and the major tick labels, set
 the ``axis_label_standoff`` property:
@@ -483,7 +524,7 @@ explicitly, e.g.
     # no additional tick locations will be displayed on the x-axis
     p.xaxis.ticker = FixedTicker(ticks=[10, 20, 37.4])
 
-However it is also possible to supply the list of ticks directly, as a
+However, it is also possible to supply the list of ticks directly as a
 shortcut, e.g. ``p.xaxis.ticker = [10, 20, 37.4]``. The example below
 demonstrates this method.
 
@@ -498,7 +539,7 @@ a collection of `Line Properties`_, prefixed with ``major_tick_`` and
 ``minor_tick_``, respectively. For instance, to set the color of the
 major ticks, use ``major_tick_line_color``. To hide either set of ticks,
 set the color to ``None``. Additionally, you can control how far in and
-out of the plotting area the ticks extend, with the properties
+out of the plotting area the ticks extend with the properties
 ``major_tick_in``/``major_tick_out`` and ``minor_tick_in``/``minor_tick_out``.
 These values are in screen units, and negative values are acceptable.
 
@@ -514,7 +555,7 @@ The text styling of axis labels is controlled by a ``TickFormatter`` object
 configured on the axis' ``formatter`` property. Bokeh uses a number of ticker
 formatters by default in different situations:
 
-* |BasicTickFormatter| --- Default formatter for  linear axes.
+* |BasicTickFormatter| --- Default formatter for linear axes.
 
 * |CategoricalTickFormatter| --- Default formatter for categorical axes.
 
@@ -523,7 +564,7 @@ formatters by default in different situations:
 * |LogTickFormatter| --- Default formatter for log axes.
 
 These default tick formatters do not expose many configurable properties.
-To control tick formatting at a finer grained level, use one of the
+To control tick formatting at a finer-grained level, use one of the
 |NumeralTickFormatter| or |PrintfTickFormatter| described below.
 
 .. note::
@@ -540,7 +581,7 @@ to control the text formatting of axis ticks.
 .. bokeh-plot:: docs/user_guide/examples/styling_numerical_tick_formatter.py
     :source-position: above
 
-Many additional formats are available, see the full |NumeralTickFormatter|
+Many additional formats are available. See the full |NumeralTickFormatter|
 documentation in the :ref:`refguide`.
 
 ``PrintfTickFormatter``
@@ -560,26 +601,13 @@ documentation in the :ref:`refguide`.
 '''''''''''''''''''''
 
 The |FuncTickFormatter| allows arbitrary tick formatting to be performed by
-supplying a JavaScript snippet as the ``code`` property. For convenience,
-there are also ``from_py_func`` and ``from_coffeescript`` class methods
-that can convert a python function or coffeescript snippet into JavaScript
-automatically. In all cases, the variable ``tick`` will contain the unformatted
-tick value and can be expected to be present in the snippet or function
-namespace at render time. The example below demonstrates configuring a
-|FuncTickFormatter| from pure JavaScript:
+supplying a JavaScript snippet as the ``code`` property. The variable ``tick``
+will contain the unformatted tick value and can be expected to be present
+in the snippet or function namespace at render time. The example below
+demonstrates configuring a |FuncTickFormatter| from pure JavaScript:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_func_tick_formatter.py
     :source-position: above
-
-The above plot could also be generated by converting a python function using
-``from_py_func``:
-
-.. code-block:: python
-
-    def ticker():
-        return "{:.0f} + {:.2f}".format(tick, tick % 1)
-
-    p.yaxis.formatter = FuncTickFormatter.from_py_func(ticker)
 
 .. _userguide_styling_axes_tick_label_orientation:
 
@@ -606,7 +634,7 @@ section of the :ref:`refguide`.
 Grids
 -----
 
-In this section you will learn how to set the visual properties of grid
+In this section, you will learn how to set the visual properties of grid
 lines and grid bands on Bokeh plots.
 
 Similar to the convenience methods for axes, there are |xgrid|, |ygrid|,
@@ -620,7 +648,7 @@ objects:
      <bokeh.models.grids.Grid at 0x106fa22e8>]
 
 These methods also return splattable lists, so that you can set an attribute
-on the list, as if it was a single object, and the attribute is changed
+on the list as if it was a single object, and the attribute is changed
 for every element of the list:
 
 .. code-block:: python
@@ -661,13 +689,20 @@ lines are hidden (i.e., their line color is set to ``None``).
 Bands
 ~~~~~
 
-It is also possible to display filled, shaded bands between adjacent
-grid lines. The visual appearance of these bands is controlled by a
-collection of `Fill Properties`_, prefixed with ``band_``. For instance,
-to set the color of grid bands, use ``band_fill_color``. To hide grid
+It is possible to display filled, shaded bands between adjacent grid lines.
+The visual appearance of these bands is controlled by a collection of
+`Fill Properties`_, and `Hatch Properties`_, prefixed with ``band_``. For
+instance, to set the color of grid bands, use ``band_fill_color``. To hide grid
 bands, set their fill color to ``None`` (this is the default).
 
+Here is an example demonstrating bands filled with a solid color:
+
 .. bokeh-plot:: docs/user_guide/examples/styling_grid_band_fill.py
+    :source-position: above
+
+And here is an example demonstrating bands filled with a hatch pattern:
+
+.. bokeh-plot:: docs/user_guide/examples/styling_grid_band_hatch.py
     :source-position: above
 
 .. _userguide_styling_grid_bounds:
@@ -705,16 +740,12 @@ objects:
     [<bokeh.models.annotations.Legend at 0x106fa2278>]
 
 This method also returns a splattable list, so that you can set an attribute
-on the list, as if it was a single object, and the attribute is changed
+on the list as if it was a single object, and the attribute is changed
 for every element of the list:
 
 .. code-block:: python
 
     p.legend.label_text_font = "times"
-
-.. note::
-    The examples in this section use NumPy to more easily generate better
-    data suitable for demonstrating legends.
 
 Location
 ~~~~~~~~
@@ -764,6 +795,25 @@ object directly:
 
 In this use-case, the location must be specified absolutely. Future releases
 will add additional options for laying out legend positions.
+
+Title
+~~~~~
+
+Legends can have a title, specified by the ``title`` property:
+
+.. code:: python
+
+    plot.legend.title = "Division"
+
+The visual appearance of the legend title is controlled by a collection of
+`Text Properties`_, prefixed with ``title_``. For instance, to set the font
+style of the legend, use ``title_text_font_style``.
+
+The distance to separate the title from the rest of the legend (in pixels)
+is controlled by the ``title_standoff`` property.
+
+.. bokeh-plot:: docs/user_guide/examples/styling_legend_title.py
+    :source-position: above
 
 Orientation
 ~~~~~~~~~~~
@@ -845,6 +895,37 @@ spacing, etc. of the legend components:
 
 .. bokeh-plot:: docs/user_guide/examples/styling_legend_dimensions.py
     :source-position: above
+
+.. _userguide_styling_render_level:
+
+Render Level
+------------
+
+Bokeh has a notion of render level to specify the order in which things are
+drawn:
+
+:image:
+    "lowest" render level, drawn before anything else
+:underlay:
+    default render level for grids
+:glyph:
+    default render level for all glyphs (i.e. above grids)
+:annotation:
+    default render level for annotation renderers
+:overlay:
+    "highest" render level, for tool overlays
+
+Within a given level, renderers are drawn in the order that they were added.
+It is sometimes useful to specify a render level explicitly. This can be done
+by setting the ``level`` parameter on the renderer. For example, to cause an
+image to show up *under* the grid lines, you can call:
+
+.. code-block:: python
+
+    p.image(..., level="image")
+
+You can see a complete example with output in the section
+:ref:`userguide_plotting_images_colormapped`.
 
 .. |Plot| replace:: :class:`~bokeh.models.plots.Plot`
 .. |select| replace:: :func:`~bokeh.models.plots.Plot.select`

@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,36 +11,30 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
-# Standard library imports
-
-# External imports
-
-# Bokeh imports
-
 #-----------------------------------------------------------------------------
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'server_url_for_websocket_url',
+    'websocket_url_for_server_url',
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
-@internal((1,0,0))
 def server_url_for_websocket_url(url):
     ''' Convert an ``ws(s)`` URL for a Bokeh server into the appropriate
     ``http(s)`` URL for the websocket endpoint.
@@ -69,7 +62,6 @@ def server_url_for_websocket_url(url):
         raise ValueError("websocket URL does not end in /ws")
     return reprotocoled[:-2]
 
-@internal((1,0,0))
 def websocket_url_for_server_url(url):
     ''' Convert an ``http(s)`` URL for a Bokeh server websocket endpoint into
     the appropriate ``ws(s)`` URL

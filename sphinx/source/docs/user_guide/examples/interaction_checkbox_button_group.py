@@ -1,10 +1,11 @@
-from bokeh.io import output_file, show
-from bokeh.layouts import widgetbox
-from bokeh.models.widgets import CheckboxButtonGroup
+from bokeh.io import show
+from bokeh.models import CheckboxButtonGroup, CustomJS
 
-output_file("checkbox_button_group.html")
+LABELS = ["Option 1", "Option 2", "Option 3"]
 
-checkbox_button_group = CheckboxButtonGroup(
-        labels=["Option 1", "Option 2", "Option 3"], active=[0, 1])
+checkbox_button_group = CheckboxButtonGroup(labels=LABELS, active=[0, 1])
+checkbox_button_group.js_on_click(CustomJS(code="""
+    console.log('checkbox_button_group: active=' + this.active, this.toString())
+"""))
 
-show(widgetbox(checkbox_button_group))
+show(checkbox_button_group)

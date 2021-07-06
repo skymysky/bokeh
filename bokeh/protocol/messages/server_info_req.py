@@ -1,19 +1,48 @@
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from ..message import Message
-from . import register
 
-@register
-class server_info_req_1(Message):
-    ''' Define the ``SERVER-INFO-REQ`` message (revision 1) for requesting a
-    Bokeh server provide information about itself.
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'server_info_req',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class server_info_req(Message):
+    ''' Define the ``SERVER-INFO-REQ`` message for requesting a Bokeh server
+    provide information about itself.
 
     The ``content`` fragment of for this message is empty.
 
     '''
 
     msgtype   = 'SERVER-INFO-REQ'
-    revision = 1
 
     @classmethod
     def create(cls, **metadata):
@@ -26,3 +55,11 @@ class server_info_req_1(Message):
         header = cls.create_header()
         content = {}
         return cls(header, metadata, content)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

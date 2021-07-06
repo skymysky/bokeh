@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Represent granular events that can be used to trigger callbacks.
 
 Bokeh documents and applications are capable of supporting various kinds of
@@ -46,49 +52,77 @@ event object that triggered the callback.
     may trigger at a very high rate.
 
 '''
-from __future__ import absolute_import
 
-import logging
-logger = logging.getLogger(__file__)
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from .util.future import with_metaclass
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
 
-_CONCRETE_EVENT_CLASSES = dict()
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-class _MetaEvent(type):
-    ''' Metaclass used to keep track of all classes subclassed from Event.
+__all__ = (
+    'ButtonClick',
+    'DocumentEvent',
+    'DocumentReady',
+    'DoubleTap',
+    'Event',
+    'LODStart',
+    'LODEnd',
+    'MenuItemClick',
+    'ModelEvent',
+    'MouseEnter',
+    'MouseLeave',
+    'MouseMove',
+    'MouseWheel',
+    'Pan',
+    'PanEnd',
+    'PanStart',
+    'Pinch',
+    'PinchEnd',
+    'PinchStart',
+    'Rotate',
+    'RotateEnd',
+    'RotateStart',
+    'PlotEvent',
+    'PointEvent',
+    'Press',
+    'PressUp',
+    'Reset',
+    'SelectionGeometry',
+    'Tap',
+)
 
-    All Concrete Event classes (i.e. not "abstract" event base classes with
-    no ``event_name``) will be added to the _CONCRETE_EVENT_CLASSES set which
-    is used to decode event instances from JSON.
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
 
-    '''
-    def __new__(cls, clsname, bases, attrs):
-        newclass = super(_MetaEvent, cls).__new__(cls, clsname, bases, attrs)
-        if newclass.event_name is not None:
-            _CONCRETE_EVENT_CLASSES[newclass.event_name] = newclass
-        return newclass
+_CONCRETE_EVENT_CLASSES = {}
 
-class Event(with_metaclass(_MetaEvent, object)):
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+class Event:
     ''' Base class for all Bokeh events.
 
     This base class is not typically useful to instantiate on its own.
 
     '''
-    _event_classes = []
-    event_name = None
+    event_name: str
 
-    def __init__(self, model):
-        ''' Create a new base event.
+    @classmethod
+    def __init_subclass__(cls):
+        super().__init_subclass__()
 
-        Args:
-
-            model (Model) : a Bokeh model to register event callbacks on
-
-        '''
-        self._model_id = None
-        if model is not None:
-            self._model_id = model._id
+        if hasattr(cls, "event_name"):
+            _CONCRETE_EVENT_CLASSES[cls.event_name] = cls
 
     @classmethod
     def decode_json(cls, dct):
@@ -115,7 +149,7 @@ class Event(with_metaclass(_MetaEvent, object)):
                 <bokeh.events.Pan object at 0x1040f84a8>
 
         '''
-        if not (('event_name' in dct) and ('event_values' in dct)):
+        if not ('event_name' in dct and 'event_values' in dct):
             return dct
 
         event_name = dct['event_name']
@@ -124,35 +158,83 @@ class Event(with_metaclass(_MetaEvent, object)):
             raise ValueError("Could not find appropriate Event class for event_name: %r" % event_name)
 
         event_values = dct['event_values']
-        model_id = event_values.pop('model_id')
-        event = _CONCRETE_EVENT_CLASSES[event_name](model=None, **event_values)
-        event._model_id = model_id
+        model_id = event_values.pop('model', {"id": None})["id"]
+        event_cls = _CONCRETE_EVENT_CLASSES[event_name]
+        if issubclass(event_cls, ModelEvent):
+            event = event_cls(model=None, **event_values)
+            event._model_id = model_id
+        else:
+            event = event_cls(**event_values)
         return event
 
-class ButtonClick(Event):
-    ''' Announce a button click event on a Bokeh Button widget.
+
+class DocumentEvent(Event):
+    ''' Base class for all Bokeh Document events.
+
+    This base class is not typically useful to instantiate on its own.
+
+    '''
+
+
+class DocumentReady(DocumentEvent):
+    ''' Announce when a Document is fully idle.
+
+    '''
+    event_name = 'document_ready'
+
+
+class ModelEvent(Event):
+    ''' Base class for all Bokeh Model events.
+
+    This base class is not typically useful to instantiate on its own.
+
+    '''
+
+    def __init__(self, model):
+        ''' Create a new base event.
+
+        Args:
+
+            model (Model) : a Bokeh model to register event callbacks on
+
+        '''
+        self._model_id = None
+        if model is not None:
+            self._model_id = model.id
+
+
+class ButtonClick(ModelEvent):
+    ''' Announce a button click event on a Bokeh button widget.
 
     '''
     event_name = 'button_click'
 
     def __init__(self, model):
-        from .models.widgets import Button
-        if model is not None and not isinstance(model, Button):
-            msg ='{clsname} event only applies to Button models'
+        from .models.widgets import AbstractButton
+        if model is not None and not isinstance(model, AbstractButton):
+            msg ='{clsname} event only applies to button models'
             raise ValueError(msg.format(clsname=self.__class__.__name__))
-        super(ButtonClick, self).__init__(model=model)
+        super().__init__(model=model)
 
-class PlotEvent(Event):
-    ''' PlotEvent is the base class for all events applicable to Plot models.
+class MenuItemClick(ModelEvent):
+    ''' Announce a button click event on a Bokeh menu item.
 
     '''
+    event_name = 'menu_item_click'
 
+    def __init__(self, model, item=None):
+        self.item = item
+        super().__init__(model=model)
+
+class PlotEvent(ModelEvent):
+    ''' The base class for all events applicable to Plot models.
+
+    '''
     def __init__(self, model):
         from .models import Plot
         if model is not None and not isinstance(model, Plot):
-            msg ='{clsname} event only applies to Plot models'
-            raise ValueError(msg.format(clsname=self.__class__.__name__))
-        super(PlotEvent, self).__init__(model=model)
+            raise ValueError(f"{self.__class__.__name__} event only applies to Plot models")
+        super().__init__(model)
 
 class LODStart(PlotEvent):
     ''' Announce the start of "interactive level-of-detail" mode on a plot.
@@ -193,16 +275,16 @@ class SelectionGeometry(PlotEvent):
     def __init__(self, model, geometry=None, final=True):
         self.geometry = geometry
         self.final = final
-        super(SelectionGeometry, self).__init__(model=model)
+        super().__init__(model=model)
 
 class Reset(PlotEvent):
-    ''' Announce a button click event on a plot ResetTool.
+    ''' Announce a button click event on a plot ``ResetTool``.
 
     '''
     event_name = "reset"
 
     def __init__(self, model):
-        super(Reset, self).__init__(model=model)
+        super().__init__(model=model)
 
 class PointEvent(PlotEvent):
     ''' Base class for UI events associated with a specific (x,y) point.
@@ -218,16 +300,12 @@ class PointEvent(PlotEvent):
     the HTML canvas.
 
     '''
-    event_name = None
-
     def __init__(self, model, sx=None, sy=None, x=None, y=None):
         self.sx = sx
         self.sy = sy
         self.x = x
         self.y = y
-        super(PointEvent, self).__init__(model=model)
-
-# --- Point Events ------------------------------------------------------------
+        super().__init__(model=model)
 
 class Tap(PointEvent):
     ''' Announce a tap or click event on a Bokeh plot.
@@ -264,6 +342,18 @@ class Press(PointEvent):
 
     '''
     event_name = 'press'
+
+class PressUp(PointEvent):
+    ''' Announce a pressup event on a Bokeh plot.
+
+    Attributes:
+        sx (float) : x-coordinate of the event in *screen* space
+        sy (float) : y-coordinate of the event in *screen* space
+        x (float) : x-coordinate of the event in *data* space
+        y (float) : y-coordinate of the event in *data* space
+
+    '''
+    event_name = 'pressup'
 
 class MouseEnter(PointEvent):
     ''' Announce a mouse enter event onto a Bokeh plot.
@@ -326,15 +416,15 @@ class MouseWheel(PointEvent):
 
     .. note::
         By default, Bokeh plots do not prevent default scroll events unless a
-        WheelZoomTool or WheelPanTool is active. This may change in future
-        releases.
+        ``WheelZoomTool`` or ``WheelPanTool`` is active. This may change in
+        future releases.
 
     '''
     event_name = 'wheel'
 
     def __init__(self, model, delta=None, **kwargs):
         self.delta = delta
-        super(MouseWheel, self).__init__(model, **kwargs)
+        super().__init__(model, **kwargs)
 
 class Pan(PointEvent):
     ''' Announce a pan event on a Bokeh plot.
@@ -355,7 +445,7 @@ class Pan(PointEvent):
         self.delta_x = delta_x
         self.delta_y = delta_y
         self.direction = direction
-        super(Pan, self).__init__(model, **kwargs)
+        super().__init__(model, **kwargs)
 
 class PanEnd(PointEvent):
     ''' Announce the end of a pan event on a Bokeh plot.
@@ -399,7 +489,7 @@ class Pinch(PointEvent):
 
     def __init__(self, model, scale=None, **kwargs):
         self.scale = scale
-        super(Pinch, self).__init__(model, **kwargs)
+        super().__init__(model, **kwargs)
 
 class PinchEnd(PointEvent):
     ''' Announce the end of a pinch event on a Bokeh plot.
@@ -430,3 +520,61 @@ class PinchStart(PointEvent):
 
     '''
     event_name = 'pinchstart'
+
+class Rotate(PointEvent):
+    ''' Announce a rotate event on a Bokeh plot.
+
+    Attributes:
+        rotation (float) : the rotation that has been done (in deg)
+        sx (float) : x-coordinate of the event in *screen* space
+        sy (float) : y-coordinate of the event in *screen* space
+        x (float) : x-coordinate of the event in *data* space
+        y (float) : y-coordinate of the event in *data* space
+
+    .. note::
+        This event is only applicable for touch-enabled devices.
+
+    '''
+    event_name = 'rotate'
+
+    def __init__(self, model, rotation=None, **kwargs):
+        self.rotation = rotation
+        super().__init__(model, **kwargs)
+
+class RotateEnd(PointEvent):
+    ''' Announce the end of a rotate event on a Bokeh plot.
+
+    Attributes:
+        sx (float) : x-coordinate of the event in *screen* space
+        sy (float) : y-coordinate of the event in *screen* space
+        x (float) : x-coordinate of the event in *data* space
+        y (float) : y-coordinate of the event in *data* space
+
+    .. note::
+        This event is only applicable for touch-enabled devices.
+
+    '''
+    event_name = 'rotateend'
+
+class RotateStart(PointEvent):
+    ''' Announce the start of a rotate event on a Bokeh plot.
+
+    Attributes:
+        sx (float) : x-coordinate of the event in *screen* space
+        sy (float) : y-coordinate of the event in *screen* space
+        x (float) : x-coordinate of the event in *data* space
+        y (float) : y-coordinate of the event in *data* space
+
+    .. note::
+        This event is only applicable for touch-enabled devices.
+
+    '''
+    event_name = 'rotatestart'
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

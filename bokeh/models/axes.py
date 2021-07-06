@@ -1,16 +1,79 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Guide renderers for various kinds of axes that can be added to
 Bokeh plots
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ..core.enums import TickLabelOrientation
 from ..core.has_props import abstract
-from ..core.properties import Auto, Datetime, Dict, Either, Enum, Float, Include, Instance, Int, Override, Seq, String, Tuple
-from ..core.property_mixins import LineProps, TextProps
-
-from .formatters import BasicTickFormatter, CategoricalTickFormatter, DatetimeTickFormatter, LogTickFormatter, TickFormatter
+from ..core.properties import (
+    Auto,
+    Datetime,
+    Dict,
+    Either,
+    Enum,
+    Float,
+    Include,
+    Instance,
+    Int,
+    Override,
+    Seq,
+    String,
+    Tuple,
+)
+from ..core.property_mixins import ScalarLineProps, ScalarTextProps
+from .formatters import (
+    BasicTickFormatter,
+    CategoricalTickFormatter,
+    DatetimeTickFormatter,
+    LogTickFormatter,
+    MercatorTickFormatter,
+    TickFormatter,
+)
 from .renderers import GuideRenderer
-from .tickers import Ticker, BasicTicker, LogTicker, CategoricalTicker, DatetimeTicker, FixedTicker
+from .tickers import (
+    BasicTicker,
+    CategoricalTicker,
+    DatetimeTicker,
+    FixedTicker,
+    LogTicker,
+    MercatorTicker,
+    Ticker,
+)
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Axis',
+    'CategoricalAxis',
+    'ContinuousAxis',
+    'DatetimeAxis',
+    'LinearAxis',
+    'LogAxis',
+    'MercatorAxis',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 @abstract
 class Axis(GuideRenderer):
@@ -21,18 +84,6 @@ class Axis(GuideRenderer):
     bounds = Either(Auto, Tuple(Float, Float), Tuple(Datetime, Datetime), help="""
     Bounds for the rendered axis. If unset, the axis will span the
     entire plot in the given dimension.
-    """)
-
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen
-    locations when rendering an axis on the plot. If unset, use the
-    default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen
-    locations when rendering an axis on the plot. If unset, use the
-    default y-range.
     """)
 
     ticker = Instance(Ticker, help="""
@@ -54,7 +105,7 @@ class Axis(GuideRenderer):
     .. code-block:: python
 
         from bokeh.plotting import figure
-        from bokeh.models.tickers import FixedTicker
+        from bokeh.models import FixedTicker
 
         p = figure()
         p.xaxis.ticker = FixedTicker(ticks=[10, 20, 37.4])
@@ -62,7 +113,7 @@ class Axis(GuideRenderer):
     """).accepts(Seq(Float), lambda ticks: FixedTicker(ticks=ticks))
 
     formatter = Instance(TickFormatter, help="""
-    A TickFormatter to use for formatting the visual appearance
+    A ``TickFormatter`` to use for formatting the visual appearance
     of ticks.
     """)
 
@@ -80,11 +131,11 @@ class Axis(GuideRenderer):
     from the tick labels.
     """)
 
-    axis_label_props = Include(TextProps, help="""
+    axis_label_props = Include(ScalarTextProps, help="""
     The %s of the axis label.
     """)
 
-    axis_label_text_font_size = Override(default={'value': "10pt"})
+    axis_label_text_font_size = Override(default="13px")
 
     axis_label_text_font_style = Override(default="italic")
 
@@ -103,7 +154,7 @@ class Axis(GuideRenderer):
     override normal formatting.
     """)
 
-    major_label_props = Include(TextProps, help="""
+    major_label_props = Include(ScalarTextProps, help="""
     The %s of the major tick labels.
     """)
 
@@ -111,13 +162,13 @@ class Axis(GuideRenderer):
 
     major_label_text_baseline = Override(default="alphabetic")
 
-    major_label_text_font_size = Override(default={'value': "8pt"})
+    major_label_text_font_size = Override(default="11px")
 
-    axis_props = Include(LineProps, help="""
+    axis_props = Include(ScalarLineProps, help="""
     The %s of the axis line.
     """)
 
-    major_tick_props = Include(LineProps, help="""
+    major_tick_props = Include(ScalarLineProps, help="""
     The %s of the major ticks.
     """)
 
@@ -131,7 +182,7 @@ class Axis(GuideRenderer):
     main plot area.
     """)
 
-    minor_tick_props = Include(LineProps, help="""
+    minor_tick_props = Include(ScalarLineProps, help="""
     The %s of the minor ticks.
     """)
 
@@ -143,6 +194,16 @@ class Axis(GuideRenderer):
     minor_tick_out = Int(default=4, help="""
     The distance in pixels that major ticks should extend out of the
     main plot area.
+    """)
+
+    fixed_location = Either(Float, String, Tuple(String, String), Tuple(String, String, String), default=None, help="""
+    Set to specify a fixed coordinate location to draw the axis. The direction
+    of ticks and major labels is determined by the side panel that the axis
+    belongs to.
+
+    .. note::
+        Axes labels are suppressed when axes are positioned at fixed locations
+        inside the central plot area.
     """)
 
 @abstract
@@ -171,40 +232,71 @@ class LogAxis(ContinuousAxis):
     formatter = Override(default=lambda: LogTickFormatter())
 
 class CategoricalAxis(Axis):
-    ''' An axis that picks evenly spaced tick locations for a
-    collection of categories/factors.
+    ''' An axis that displays ticks and labels for categorical ranges.
+
+    The ``CategoricalAxis`` can handle factor ranges with up to two levels of
+    nesting, including drawing a separator line between top-level groups of
+    factors.
 
     '''
     ticker = Override(default=lambda: CategoricalTicker())
 
     formatter = Override(default=lambda: CategoricalTickFormatter())
 
-    separator_props = Include(LineProps, help="""
+    separator_props = Include(ScalarLineProps, help="""
     The %s of the separator line between top-level categorical groups.
+
+    This property always applies to factors in the outermost level of nesting.
     """)
 
     separator_line_color = Override(default="lightgrey")
-
     separator_line_width = Override(default=2)
 
-    group_props = Include(TextProps, help="""
-    The %s of the group top-level categorical groups.
+    group_props = Include(ScalarTextProps, help="""
+    The %s of the group categorical labels.
+
+    This property always applies to factors in the outermost level of nesting.
+    If the list of categorical factors is flat (i.e. no nesting) then this
+    property has no effect.
     """)
 
-    group_text_font_size = Override(default={'value': "8pt"})
+    group_label_orientation = Either(Enum(TickLabelOrientation), Float, default="parallel", help="""
+    What direction the group label text should be oriented.
+
+    If a number is supplied, the angle of the text is measured from horizontal.
+
+    This property always applies to factors in the outermost level of nesting.
+    If the list of categorical factors is flat (i.e. no nesting) then this
+    property has no effect.
+    """)
+
+    group_text_font_size = Override(default="11px")
     group_text_font_style = Override(default="bold")
     group_text_color = Override(default="grey")
 
-    subgroup_props = Include(TextProps, help="""
-    The %s of the group top-level categorical groups.
+    subgroup_props = Include(ScalarTextProps, help="""
+    The %s of the subgroup categorical labels.
+
+    This property always applies to factors in the middle level of nesting.
+    If the list of categorical factors is has only zero or one levels of nesting,
+    then this property has no effect.
     """)
 
-    subgroup_text_font_size = Override(default={'value': "8pt"})
+    subgroup_label_orientation = Either(Enum(TickLabelOrientation), Float, default="parallel", help="""
+    What direction the subgroup label text should be oriented.
+
+    If a number is supplied, the angle of the text is measured from horizontal.
+
+    This property always applies to factors in the middle level of nesting.
+    If the list of categorical factors is has only zero or one levels of nesting,
+    then this property has no effect.
+    """)
+
+    subgroup_text_font_size = Override(default="11px")
     subgroup_text_font_style = Override(default="bold")
 
-
 class DatetimeAxis(LinearAxis):
-    ''' An LinearAxis that picks nice numbers for tick locations on
+    ''' A ``LinearAxis`` that picks nice numbers for tick locations on
     a datetime scale. Configured with a ``DatetimeTickFormatter`` by
     default.
 
@@ -213,3 +305,39 @@ class DatetimeAxis(LinearAxis):
     ticker = Override(default=lambda: DatetimeTicker())
 
     formatter = Override(default=lambda: DatetimeTickFormatter())
+
+class MercatorAxis(LinearAxis):
+    ''' An axis that picks nice numbers for tick locations on a
+    Mercator scale. Configured with a ``MercatorTickFormatter`` by default.
+
+    Args:
+        dimension ('lat' or 'lon', optional) :
+            Whether this axis will display latitude or longitude values.
+            (default: 'lat')
+
+    '''
+    def __init__(self, dimension='lat', **kw):
+        super().__init__(**kw)
+
+        # Just being careful. It would be defeat the purpose for anyone to actually
+        # configure this axis with different kinds of tickers or formatters.
+        if isinstance(self.ticker, MercatorTicker):
+            self.ticker.dimension = dimension
+        if isinstance(self.formatter, MercatorTickFormatter):
+            self.formatter.dimension = dimension
+
+    ticker = Override(default=lambda: MercatorTicker())
+
+    formatter = Override(default=lambda: MercatorTickFormatter())
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

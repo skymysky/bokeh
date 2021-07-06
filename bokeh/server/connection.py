@@ -1,11 +1,39 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provides the ``ServerSession`` class.
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import codecs
 
-class ServerConnection(object):
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'ServerConnection',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+class ServerConnection:
     ''' Wraps a websocket connection to a client.
     '''
 
@@ -40,6 +68,7 @@ class ServerConnection(object):
     def send_patch_document(self, event):
         """ Sends a PATCH-DOC message, returning a Future that's completed when it's written out. """
         msg = self.protocol.create('PATCH-DOC', [event])
+        # yes, *return* the awaitable, it will be awaited when pending writes are processed
         return self._socket.send_message(msg)
 
     def send_ping(self):
@@ -49,3 +78,15 @@ class ServerConnection(object):
     @property
     def protocol(self):
         return self._protocol
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

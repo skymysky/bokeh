@@ -1,15 +1,46 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 '''
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from ...core.has_props import abstract
-from ...core.properties import Bool, Instance, Int, List, String
-
-from ..callbacks import Callback
-
+from ...core.properties import Bool, Int, List, String
 from .buttons import ButtonLike
 from .widget import Widget
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'AbstractGroup',
+    'ButtonGroup',
+    'CheckboxButtonGroup',
+    'CheckboxGroup',
+    'Group',
+    'RadioButtonGroup',
+    'RadioGroup',
+)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 @abstract
 class AbstractGroup(Widget):
@@ -38,10 +69,6 @@ class AbstractGroup(Widget):
         ''' Set up a handler for button check/radio box clicks including the selected indices. '''
         self.js_on_change('active', handler)
 
-    callback = Instance(Callback, help="""
-    A callback to run in the browser whenever a button group is manipulated.
-    """)
-
 @abstract
 class ButtonGroup(AbstractGroup, ButtonLike):
     ''' Abstract base class for groups with items rendered as buttons.
@@ -59,6 +86,10 @@ class Group(AbstractGroup):
     Should items be arrange vertically (``False``) or horizontally
     in-line (``True``).
     """)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class CheckboxGroup(Group):
     ''' A group of check boxes.
@@ -97,3 +128,11 @@ class RadioButtonGroup(ButtonGroup):
     The index of the selected radio box, or ``None`` if nothing is
     selected.
     """)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

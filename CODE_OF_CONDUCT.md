@@ -7,6 +7,9 @@ of this CoC is simply a reflection of the community values already evident in pr
 
 > Please be always kind and courteous. There's never a need to be mean or rude or disrespectful.
 
+If you wish to bring something to the attention of the project team, please contact
+[conduct@bokeh.org](mailto:conduct@bokeh.org)
+
 ## The Longer Version
 
 However, for the sake of decreasing any ambiguity, the details of this CoC are laid out explicitly
@@ -76,8 +79,8 @@ further defined and clarified by project maintainers.
 ### Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at bokeh-conduct@numfocus.org. All
-complaints will be reviewed and investigated and any appropriate measures
+reported by contacting the project team at [conduct@bokeh.org](mailto:conduct@bokeh.org). All
+reports will be reviewed by the [Conduct Sub-committee](https://github.com/bokeh/bokeh/wiki/BEP-4:-Project-Roles#conduct-sub-committee) and investigated and any appropriate measures
 will be taken. The project team commits to maintaining confidentiality
 with regard to the reporter of an incident. Further details of specific
 enforcement policies may be posted separately.
@@ -86,6 +89,10 @@ Project maintainers who do not follow or enforce the Code of Conduct in good
 faith will face temporary or permanent repercussions as determined by other
 members of the project's leadership.
 
+### Escalation
+
+In the event it is necessary to make a report involving someone on the NumFocus committee itself, please use the general [NumFocus CoC reporting form](https://numfocus.org/code-of-conduct).
+
 ### Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 1.4,
@@ -93,3 +100,11 @@ available at [http://contributor-covenant.org/version/1/4][version]
 
 [homepage]: http://contributor-covenant.org
 [version]: http://contributor-covenant.org/version/1/4/
+
+### Revisions
+
+|Date| Change|
+|------|---------------------------|
+|2019-03-01 | Updated reporting email to conduct@bokeh.org |
+|2020-05-03 | Link to conduct subcommittee and NF CoC form for escalation|
+|2020-05-04 | Typos and minor word edits |

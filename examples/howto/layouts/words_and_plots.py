@@ -1,10 +1,9 @@
+from bokeh.io import output_file, show
+from bokeh.layouts import layout
+from bokeh.models import ColumnDataSource, Div, HoverTool, Paragraph
+from bokeh.plotting import figure
 from bokeh.sampledata.glucose import data
 from bokeh.sampledata.iris import flowers
-
-from bokeh.io import show, output_file
-from bokeh.layouts import layout
-from bokeh.models import ColumnDataSource, Paragraph, HoverTool, Div
-from bokeh.plotting import figure
 
 output_file("words_and_plots.html")
 
@@ -36,7 +35,7 @@ def scatter():
     s.xaxis.axis_label = 'Petal Length'
     s.yaxis.axis_label = 'Petal Width'
     s.circle("petal_length", "petal_width", color="colors", source=source,
-             fill_alpha=0.2, size=10, legend="species")
+             fill_alpha=0.2, size=10, legend_group="species")
     # Lets move the legend off-canvas!
     legend = s.legend[0]
     legend.border_line_color = None
@@ -47,8 +46,8 @@ def scatter():
 
 
 def hover_plot():
-    x = data.ix['2010-10-06'].index.to_series()
-    y = data.ix['2010-10-06']['glucose']
+    x = data.loc['2010-10-06'].index.to_series()
+    y = data.loc['2010-10-06']['glucose']
     p = figure(
         plot_width=800, plot_height=400, x_axis_type="datetime",
         tools="", toolbar_location=None, title='Hover over points'

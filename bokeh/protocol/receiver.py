@@ -1,18 +1,44 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Assemble WebSocket wire message fragments into complete Bokeh Server
 message objects that can be processed.
 
 '''
-from __future__ import absolute_import
 
-import six
-from tornado.concurrent import return_future
-
-from .exceptions import ValidationError
-
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
-class Receiver(object):
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from .exceptions import ValidationError
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Receiver',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class Receiver:
     ''' Receive wire message fragments and assemble complete Bokeh server
     message objects.
 
@@ -58,11 +84,11 @@ class Receiver(object):
     '''
 
     def __init__(self, protocol):
-        ''' Configure a Receiver with a specific Bokeh protocol version.
+        ''' Configure a Receiver with a specific Bokeh protocol.
 
         Args:
             protocol (Protocol) :
-                A Bokeh protocol object to use to assemble colleted message
+                A Bokeh protocol object to use to assemble collected message
                 fragments.
         '''
         self._protocol = protocol
@@ -70,8 +96,7 @@ class Receiver(object):
         self._message = None
         self._buf_header = None
 
-    @return_future
-    def consume(self, fragment, callback=None):
+    async def consume(self, fragment):
         ''' Consume individual protocol message fragments.
 
         Args:
@@ -80,12 +105,9 @@ class Receiver(object):
                 assembled, the receiver state will reset to begin consuming a
                 new message.
 
-            callback (callable, optional)
-                Argument required by ``return_future`` decorator
-
         '''
         self._current_consumer(fragment)
-        callback(self._message)
+        return self._message
 
     def _HEADER(self, fragment):
         self._assume_text(fragment)
@@ -128,9 +150,17 @@ class Receiver(object):
             self._current_consumer = self._BUFFER_HEADER
 
     def _assume_text(self, fragment):
-        if not isinstance(fragment, six.text_type):
+        if not isinstance(fragment, str):
             raise ValidationError("expected text fragment but received binary fragment for %s" % (self._current_consumer.__name__))
 
     def _assume_binary(self, fragment):
-        if not isinstance(fragment, six.binary_type):
+        if not isinstance(fragment, bytes):
             raise ValidationError("expected binary fragment but received text fragment for %s" % (self._current_consumer.__name__))
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

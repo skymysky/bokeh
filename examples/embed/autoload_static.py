@@ -1,5 +1,4 @@
 from jinja2 import Template
-
 from tornado.ioloop import IOLoop
 from tornado.web import Application, RequestHandler
 
@@ -21,7 +20,7 @@ template = Template("""
   <div>
     The plot embedded below is a standalone plot that was embedded using
     <fixed>autoload_static</fixed>. For more information see the
-    <a target="_blank" href="https://bokeh.pydata.org/en/latest/docs/user_guide/embed.html#static-data">
+    <a target="_blank" href="https://docs.bokeh.org/en/latest/docs/user_guide/embed.html#autoload-scripts">
     documentation</a>.
   </div>
   {{ script|safe }}
@@ -57,7 +56,7 @@ def make_plot():
     return p
 
 if __name__ == '__main__':
-    print('Opening Tornado app with embedded Bokeh plot on http://localhost:8888/')
+    print('Opening Tornado app with embedded Bokeh plot on http://localhost:8080/')
 
     js, script = autoload_static(make_plot(), CDN, "embed.js")
 
@@ -65,8 +64,8 @@ if __name__ == '__main__':
         (r"/", IndexHandler, dict(script=script)),
         (r"/embed.js", JSHandler, dict(js=js))
     ])
-    app.listen(8888)
+    app.listen(8080)
 
     io_loop = IOLoop.current()
-    io_loop.add_callback(view, "http://localhost:8888/")
+    io_loop.add_callback(view, "http://localhost:8080/")
     io_loop.start()

@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,40 +11,44 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
 # Standard library imports
-from contextlib import contextmanager
-
-# External imports
+from typing import Optional, Tuple, Union
 
 # Bokeh imports
-from ..core.templates import DOC_JS
 from ..core.json_encoder import serialize_json
-from ..settings import settings
-from ..util.string import encode_utf8
-from .util import FromCurdoc
-from .util import check_one_model_or_doc, div_for_render_item, find_existing_docs, standalone_docs_json_and_render_items
+from ..core.templates import DOC_NB_JS
+from ..document import Document
+from ..model import Model
+from ..themes import Theme
+from .elements import div_for_render_item
+from .util import FromCurdoc, OutputDocumentFor, standalone_docs_json_and_render_items
 
 #-----------------------------------------------------------------------------
 # Globals and constants
 #-----------------------------------------------------------------------------
 
+__all__ = (
+    'notebook_content'
+)
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-def notebook_content(model, notebook_comms_target=None, theme=FromCurdoc):
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+ThemeSource = Union[Theme, FromCurdoc, None]
+
+def notebook_content(model: Model, notebook_comms_target: Optional[str] = None, theme: ThemeSource = FromCurdoc) -> Tuple[str, str, Document]:
     ''' Return script and div that will display a Bokeh plot in a Jupyter
     Notebook.
 
@@ -73,65 +76,30 @@ def notebook_content(model, notebook_comms_target=None, theme=FromCurdoc):
 
     '''
 
-    model = check_one_model_or_doc(model)
+    if not isinstance(model, Model):
+        raise ValueError("notebook_content expects a single Model instance")
 
     # Comms handling relies on the fact that the new_doc returned here
     # has models with the same IDs as they were started with
-    with _ModelInEmptyDocument(model, apply_theme=theme) as new_doc:
-        (docs_json, render_items) = standalone_docs_json_and_render_items([model])
+    with OutputDocumentFor([model], apply_theme=theme, always_new=True) as new_doc:
+        (docs_json, [render_item]) = standalone_docs_json_and_render_items([model])
 
-    item = render_items[0]
+    div = div_for_render_item(render_item)
+
+    render_item = render_item.to_json()
     if notebook_comms_target:
-        item['notebook_comms_target'] = notebook_comms_target
-    else:
-        notebook_comms_target = ''
+        render_item["notebook_comms_target"] = notebook_comms_target
 
-    script = DOC_JS.render(
+    script = DOC_NB_JS.render(
         docs_json=serialize_json(docs_json),
-        render_items=serialize_json(render_items)
+        render_items=serialize_json([render_item]),
     )
 
-    div = div_for_render_item(item)
-
-    return encode_utf8(script), encode_utf8(div), new_doc
-
-#-----------------------------------------------------------------------------
-# Internal API
-#-----------------------------------------------------------------------------
+    return script, div, new_doc
 
 #-----------------------------------------------------------------------------
 # Private API
 #-----------------------------------------------------------------------------
-
-@contextmanager
-def _ModelInEmptyDocument(model, apply_theme=None):
-
-    # Note: Comms handling relies on the fact that the new_doc returned
-    # has models with the same IDs as they were started with
-
-    from ..document import Document
-    doc = find_existing_docs([model])
-
-    if apply_theme is FromCurdoc:
-        from ..io import curdoc; curdoc
-        doc.theme = curdoc().theme
-    elif apply_theme is not None:
-        doc.theme = apply_theme
-
-    model._document = None
-    for ref in model.references():
-        ref._document = None
-    new_doc = Document()
-    new_doc.add_root(model)
-
-    if settings.perform_document_validation():
-        new_doc.validate()
-
-    yield new_doc
-
-    model._document = doc
-    for ref in model.references():
-        ref._document = doc
 
 #-----------------------------------------------------------------------------
 # Code

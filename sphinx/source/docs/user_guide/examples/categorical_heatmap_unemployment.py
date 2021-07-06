@@ -1,7 +1,8 @@
 import pandas as pd
 
 from bokeh.io import output_file, show
-from bokeh.models import BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
+from bokeh.models import (BasicTicker, ColorBar, ColumnDataSource,
+                          LinearColorMapper, PrintfTickFormatter,)
 from bokeh.plotting import figure
 from bokeh.sampledata.unemployment1948 import data
 from bokeh.transform import transform
@@ -37,7 +38,7 @@ p.add_layout(color_bar, 'right')
 
 p.axis.axis_line_color = None
 p.axis.major_tick_line_color = None
-p.axis.major_label_text_font_size = "5pt"
+p.axis.major_label_text_font_size = "7px"
 p.axis.major_label_standoff = 0
 p.xaxis.major_label_orientation = 1.0
 

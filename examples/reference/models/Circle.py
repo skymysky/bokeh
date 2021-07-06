@@ -1,8 +1,7 @@
 import numpy as np
 
-from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid
-from bokeh.models.markers import Circle
 from bokeh.io import curdoc, show
+from bokeh.models import Circle, ColumnDataSource, Grid, LinearAxis, Plot
 
 N = 9
 x = np.linspace(-2, 2, N)
@@ -11,14 +10,11 @@ sizes = np.linspace(10, 20, N)
 
 source = ColumnDataSource(dict(x=x, y=y, sizes=sizes))
 
-xdr = DataRange1d()
-ydr = DataRange1d()
-
 plot = Plot(
-    title=None, x_range=xdr, y_range=ydr, plot_width=300, plot_height=300,
-    h_symmetry=False, v_symmetry=False, min_border=0, toolbar_location=None)
+    title=None, plot_width=300, plot_height=300,
+    min_border=0, toolbar_location=None)
 
-glyph = Circle(x="x", y="y", size="sizes", line_color="#3288Bd", fill_color="white", line_width=3)
+glyph = Circle(x="x", y="y", size="sizes", line_color="#3288bd", fill_color="white", line_width=3)
 plot.add_glyph(source, glyph)
 
 xaxis = LinearAxis()

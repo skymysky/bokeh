@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -37,12 +36,8 @@ Example:
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -50,10 +45,7 @@ from bokeh.util.api import public, internal ; public, internal
 
 # Standard library imports
 from functools import partial
-
-# External imports
-
-# Bokeh imports
+from typing import Any, Callable, Iterable, Iterator, Sequence
 
 #-----------------------------------------------------------------------------
 # Globals and constants
@@ -68,13 +60,11 @@ __all__ = (
     'repeat',
     'sine',
 )
-
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-def bounce(sequence):
+def bounce(sequence: Sequence[int]) -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a "bounced" sequence
     of values.
 
@@ -89,7 +79,7 @@ def bounce(sequence):
 
     '''
     N = len(sequence)
-    def f(i):
+    def f(i: int) -> int:
         div, mod = divmod(i, N)
         if div % 2 == 0:
             return sequence[mod]
@@ -97,8 +87,7 @@ def bounce(sequence):
             return sequence[N-mod-1]
     return partial(force, sequence=_advance(f))
 
-@public((1,0,0))
-def cosine(w, A=1, phi=0, offset=0):
+def cosine(w: float, A: float = 1, phi: float = 0, offset: float = 0) -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a sequence of cosine values.
 
     .. code-block:: none
@@ -113,19 +102,17 @@ def cosine(w, A=1, phi=0, offset=0):
 
     '''
     from math import cos
-    def f(i):
+    def f(i: float) -> float:
         return A * cos(w*i + phi) + offset
     return partial(force, sequence=_advance(f))
 
-@public((1,0,0))
-def count():
+def count() -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a simple count.
 
     '''
     return partial(force, sequence=_advance(lambda x: x))
 
-@public((1,0,0))
-def force(f, sequence):
+def force(f: Callable[[Any], None], sequence: Iterator[Any]) -> Callable[[], None]:
     ''' Return a decorator that can "force" a function with an arbitrary
     supplied generator
 
@@ -137,12 +124,11 @@ def force(f, sequence):
         decorator
 
     '''
-    def wrapper():
+    def wrapper() -> None:
         f(next(sequence))
     return wrapper
 
-@public((1,0,0))
-def linear(m=1, b=0):
+def linear(m: float = 1, b: float = 0) -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a sequence of linear values.
 
     .. code-block:: none
@@ -154,12 +140,11 @@ def linear(m=1, b=0):
         x (float) : an offset for the linear driver
 
     '''
-    def f(i):
+    def f(i: float) -> float:
         return m * i + b
     return partial(force, sequence=_advance(f))
 
-@public((1,0,0))
-def repeat(sequence):
+def repeat(sequence: Sequence[int]) -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a repeated of values.
 
     .. code-block:: none
@@ -173,12 +158,11 @@ def repeat(sequence):
 
     '''
     N = len(sequence)
-    def f(i):
+    def f(i: int) -> int:
         return sequence[i%N]
     return partial(force, sequence=_advance(f))
 
-@public((1,0,0))
-def sine(w, A=1, phi=0, offset=0):
+def sine(w: float, A: float = 1, phi: float = 0, offset: float = 0) -> "partial[Callable[[], None]]":
     ''' Return a driver function that can advance a sequence of sine values.
 
     .. code-block:: none
@@ -193,19 +177,19 @@ def sine(w, A=1, phi=0, offset=0):
 
     '''
     from math import sin
-    def f(i):
+    def f(i: float) -> float:
         return A * sin(w*i + phi) + offset
     return partial(force, sequence=_advance(f))
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Private API
 #-----------------------------------------------------------------------------
 
-def _advance(f):
+def _advance(f: Callable[[int], Any]) -> Iterable[Any]:
     ''' Yield a sequence generated by calling a given function with
     successively incremented integer values.
 

@@ -1,12 +1,8 @@
-from bokeh.plotting import show, output_file
-from bokeh.models import Plot, Title, Circle, ColumnDataSource, DataRange1d, LinearAxis, Range1d
-
-xdr = DataRange1d()
-ydr = DataRange1d()
+from bokeh.models import Circle, ColumnDataSource, LinearAxis, Plot, Range1d, Title
+from bokeh.plotting import output_file, show
 
 p = Plot(
     title=None, toolbar_location=None,
-    x_range=xdr, y_range=ydr,
     plot_width=800, plot_height=800,
     min_border=30,
     background_fill_color="#F0F0F0",

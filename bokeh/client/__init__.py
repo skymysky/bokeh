@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -22,27 +21,46 @@ server using ``bokeh.client``, this practice is **HIGHLY DISCOURAGED**.
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
-from bokeh.util.api import public, internal ; public, internal
-
 #-----------------------------------------------------------------------------
-# Public API
+# Imports
 #-----------------------------------------------------------------------------
 
-from .session import ClientSession
-from .session import pull_session
-from .session import push_session
-from .session import show_session
-from .session import DEFAULT_SESSION_ID
+# Bokeh imports
+from .session import (
+    DEFAULT_SESSION_ID,
+    ClientSession,
+    pull_session,
+    push_session,
+    show_session,
+)
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
 __all__ = (
     'ClientSession',
+    'DEFAULT_SESSION_ID',
     'pull_session',
     'push_session',
     'show_session',
-    'DEFAULT_SESSION_ID',
 )
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

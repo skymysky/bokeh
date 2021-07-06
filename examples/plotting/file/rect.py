@@ -1,7 +1,7 @@
 import numpy as np
 
 from bokeh.layouts import gridplot
-from bokeh.plotting import figure, show, output_file
+from bokeh.plotting import figure, output_file, show
 
 x = np.linspace(0, 4*np.pi, 80)
 y = np.sin(x)
@@ -23,4 +23,4 @@ p3.rect(x, y, 0.1, 0.1, alpha=0.5, color="navy", angle=-np.pi/6)
 
 output_file("rect.html", title="rect.py example")
 
-show(gridplot(p1, p2, p3, ncols=2, plot_width=400, plot_height=400))
+show(gridplot([p1, p2, p3], ncols=2, plot_width=400, plot_height=400))

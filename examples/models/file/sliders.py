@@ -1,14 +1,11 @@
-from __future__ import print_function
-
 from datetime import date
 
 from bokeh.document import Document
 from bokeh.embed import file_html
+from bokeh.models import (Column, CustomJS, DateRangeSlider,
+                          DateSlider, Div, RangeSlider, Row, Slider,)
 from bokeh.resources import INLINE
 from bokeh.util.browser import view
-from bokeh.models.layouts import Row, Column, WidgetBox
-from bokeh.models.widgets import Slider, RangeSlider, DateSlider, DateRangeSlider, Div
-from bokeh.models.callbacks import CustomJS
 
 slider = Slider(title="Numerical", value=50, start=0, end=96, step=5)
 
@@ -26,29 +23,26 @@ no_title_slider = Slider(title=None, value=50, start=0, end=96, step=5)
 
 def color_picker():
     def color_slider(title, color):
-        return Slider(title=title, show_value=False, height=300, value=127, start=0, end=255, step=1, orientation="vertical", bar_color=color)
+        return Slider(title=title, show_value=False, value=127, start=0, end=255, step=1, orientation="vertical", bar_color=color)
 
     red   = color_slider("R", "red")
     green = color_slider("G", "green")
     blue  = color_slider("B", "blue")
 
-    div = Div(width=100, height=100, style=dict(backgroundColor="rgb(127, 127, 127"))
+    div = Div(width=100, height=100, background="rgb(127, 127, 127)")
 
     cb = CustomJS(args=dict(red=red, green=green, blue=blue, div=div), code="""
-        var color = "rgb(" + red.value + ", " + green.value + ", " + blue.value + ")";
-        div.style = {backgroundColor: color};
+        const r = red.value
+        const g = green.value
+        const b = blue.value
+        div.background = `rgb(${r}, ${g}, ${b})`
     """)
 
-    red.callback   = cb
-    green.callback = cb
-    blue.callback  = cb
+    red.js_on_change('value', cb)
+    green.js_on_change('value', cb)
+    blue.js_on_change('value', cb)
 
-    return Row(children=[
-        WidgetBox(width=50, children=[red]),
-        WidgetBox(width=50, children=[green]),
-        WidgetBox(width=50, children=[blue]),
-        div,
-    ])
+    return Row(children=[red, green, blue, div])
 
 sliders = Row(children=[
     Column(children=[

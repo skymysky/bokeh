@@ -1,19 +1,45 @@
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from bokeh import __version__
 
+# Bokeh imports
 from ..message import Message
-from . import register
 
-_VERSION_INFO = {
-    'bokeh'  : __version__,
-    'server' : __version__,
-}
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-@register
-class server_info_reply_1(Message):
-    ''' Define the ``SERVER-INFO-REPLY`` message (revision 1) for replying to
-    Server info requests from clients.
+__all__ = (
+    'server_info_reply',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class server_info_reply(Message):
+    ''' Define the ``SERVER-INFO-REPLY`` message for replying to Server info
+    requests from clients.
 
     The ``content`` fragment of for this message is has the form:
 
@@ -29,7 +55,6 @@ class server_info_reply_1(Message):
     '''
 
     msgtype  = 'SERVER-INFO-REPLY'
-    revision = 1
 
     @classmethod
     def create(cls, request_id, **metadata):
@@ -48,3 +73,16 @@ class server_info_reply_1(Message):
             'version_info': _VERSION_INFO,
         }
         return cls(header, metadata, content)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+_VERSION_INFO = {
+    'bokeh'  : __version__,
+    'server' : __version__,
+}
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

@@ -1,12 +1,46 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provides a base class for defining subcommands of the Bokeh command
 line application.
 
 '''
+
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 from abc import ABCMeta, abstractmethod
+from argparse import ArgumentParser, Namespace
+from typing import Union
 
-from bokeh.util.future import with_metaclass
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-class Subcommand(with_metaclass(ABCMeta)):
+__all__ = (
+    'Subcommand',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class Subcommand(metaclass=ABCMeta):
     ''' Abstract base class for subcommands
 
     Subclasses should implement an ``invoke(self, args)`` method that accepts
@@ -56,7 +90,12 @@ class Subcommand(with_metaclass(ABCMeta)):
 
     '''
 
-    def __init__(self, parser):
+    # specifying static typing of instance attributes
+    # see https://stackoverflow.com/a/51191130
+    name: str
+    help: str
+
+    def __init__(self, parser: ArgumentParser) -> None:
         ''' Initialize the subcommand with its parser
 
         Args:
@@ -77,16 +116,29 @@ class Subcommand(with_metaclass(ABCMeta)):
             self.parser.add_argument(*flags, **arg[1])
 
     @abstractmethod
-    def invoke(self, args):
+    def invoke(self, args: Namespace) -> Union[bool, None]:
         ''' Takes over main program flow to perform the subcommand.
 
         *This method must be implemented by subclasses.*
+        subclassed overwritten methods return different types:
+        bool: Build
+        None: FileOutput (subclassed by HTML, SVG and JSON. PNG overwrites FileOutput.invoke method), Info, Init, \
+                Sampledata, Secret, Serve, Static
+
 
         Args:
-            args (seq) : command line arguments for the subcommand to parse
+            args (argparse.Namespace) : command line arguments for the subcommand to parse
 
         Raises:
             NotImplementedError
 
         '''
         raise NotImplementedError("implement invoke()")
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

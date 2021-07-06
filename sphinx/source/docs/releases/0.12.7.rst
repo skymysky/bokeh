@@ -1,8 +1,10 @@
-0.12.7 (Aug 2017)
-=================
+.. _release-0-12-7:
 
-Bokeh Version ``0.12.7`` is an incremental update that adds a few important
-features and fixes several bugs. Some of the highlights include:
+0.12.7
+======
+
+Bokeh Version ``0.12.7`` (Aug 2017) is an incremental update that adds a few
+important features and fixes several bugs. Some of the highlights include:
 
 * Support graphs/trees/networks (:bokeh-issue:`187`) including configurable
   and extendable policies for highlighting and selection.
@@ -14,8 +16,8 @@ features and fixes several bugs. Some of the highlights include:
 * New module :ref:`bokeh.transform` with helper functions for simplifying
   ``DataSpec`` expressions, including  :func:`~bokeh.transform.jitter`,
   :func:`~bokeh.transform.dodge`, :func:`~bokeh.transform.factor_cmap`, etc.
-* Added :func:`~bokeh.plotting.figure.Figure.hbar_stack` and
-  :func:`~bokeh.plotting.figure.Figure.vbar_stack` to greatly simplify
+* Added :func:`~bokeh.plotting.Figure.hbar_stack` and
+  :func:`~bokeh.plotting.Figure.vbar_stack` to greatly simplify
   creation of stacked bar charts.
 * Improvements for using Bokeh with Categorical data:
 
@@ -30,13 +32,10 @@ features and fixes several bugs. Some of the highlights include:
  Many other small bugfixes and docs additions. For full details see the
  :bokeh-tree:`CHANGELOG`.
 
-Migration Guide
----------------
+.. _release-0-12-7-migration:
 
-NOTE: the 0.12.x series is the last planned release series before a
-version 1.0 release. The focus of the 1.0 release will be implementing
-build automation to enforce API stability, and a very small number of
-high value features. For more information see the `project roadmap`_.
+`Migration Guide <releases.html#release-0-12-7-migration>`__
+------------------------------------------------------------
 
 Breakage Related to Categoricals Overhaul
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -96,7 +95,7 @@ two simpler functions :func:`~bokeh.embed.server_document` and
 ``bokeh.models.tools.tool_events`` has been deprecated. Users should instead
 use the ``SelectionGeometry`` event present on ``Plot`` or ``Figure``.
 
-``DynamicImageRenderer`` and ``Plot.add_dyanamic_image`` have been deprecated.
+``DynamicImageRenderer`` and ``Plot.add_dynamic_image`` have been deprecated.
 For GIS-related use-cases built on top of Bokeh, consider using
 GeoViews_, or creating a `Custom Extension`_.
 
@@ -119,7 +118,7 @@ TapTool Callback Calling Convention
 
 The TapTool strayed from usual callback calling convention by passing a glyph
 data source as ``cb_obj``. This has been rectified, and now the tool follows the
-usual convetion: the tool itself is passed as ``cb_obj`` and the data source is
+usual convention: the tool itself is passed as ``cb_obj`` and the data source is
 passed as part of the optional ``cb_data``. Existing usage of ``OpenURL`` is
 unaffected by this change, but any ``CustomJS`` callbacks used with the tap tool
 will need to be updated to reflect this change.
@@ -166,6 +165,6 @@ way:
 * Old cruft code to handle Tornado < 4.3 (which is no longer supported) was
   removed.
 
-.. _Custom Extension: https://bokeh.pydata.org/en/latest/docs/user_guide/extensions.html
+.. _Custom Extension: https://docs.bokeh.org/en/latest/docs/user_guide/extensions.html
 .. _GeoViews: http://geo.holoviews.org
-.. _project roadmap: https://bokehplots.com/pages/roadmap.html
+.. _project roadmap: https://bokeh.org/roadmap

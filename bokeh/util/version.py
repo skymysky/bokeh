@@ -1,4 +1,10 @@
-""" Provide a version for the Bokeh library.
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
+''' Provide a version for the Bokeh library.
 
 This module uses `versioneer`_ to manage version strings. During development,
 `versioneer`_ will compute a version string from the current git revision.
@@ -9,20 +15,71 @@ Attributes:
     __version__:
         The full version string for this installed Bokeh library
 
-    __base_version__:
-        The base version string , without any "dev", "rc" or local build
+Functions:
+    base_version:
+        Return the base version string, without any "dev", "rc" or local build
         information appended.
+
+    is_full_release:
+        Return whether the current installed version is a full release.
 
 .. _versioneer: https://github.com/warner/python-versioneer
 
-"""
-from __future__ import absolute_import
+'''
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
 from .._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
 
-def base_version():
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'base_version',
+    'is_full_release',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+def base_version() -> str:
+    return _base_version_helper(__version__)
+
+def is_full_release(version: str = None) -> bool:
+    import re
+    version = version or __version__
+    VERSION_PAT = re.compile(r"^(\d+\.\d+\.\d+)$")
+    return bool(VERSION_PAT.match(version))
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+def _base_version_helper(version: str) -> str:
     import re
     VERSION_PAT = re.compile(r"^(\d+\.\d+\.\d+)((?:dev|rc).*)?")
-    return VERSION_PAT.search(__version__).group(1)
+    match = VERSION_PAT.search(version)
+    assert match is not None
+    return match.group(1)
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
+
+__version__ = get_versions()['version']
+del get_versions

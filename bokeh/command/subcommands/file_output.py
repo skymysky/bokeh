@@ -1,26 +1,61 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Abstract base class for subcommands that output to a file (or stdout).
 
 '''
-from __future__ import absolute_import
 
-from abc import abstractmethod
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import argparse
-import io
+import sys
+from abc import abstractmethod
+from os.path import splitext
+from typing import Dict, List, Optional, Tuple, Union
 
-from bokeh.util.string import decode_utf8
-
+# Bokeh imports
+from ...document import Document
 from ..subcommand import Subcommand
 from ..util import build_single_handler_applications, die
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'FileOutputSubcommand',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class FileOutputSubcommand(Subcommand):
     ''' Abstract subcommand to output applications as some type of file.
 
     '''
 
-    extension = None # subtype must set this to file extension
+    # subtype must set this instance attribute to file extension
+    extension: str
 
     @classmethod
-    def files_arg(cls, output_type_name):
+    def files_arg(cls, output_type_name: str) -> Tuple[str, Dict[str, Optional[str]]]:
         ''' Returns a positional arg for ``files`` to specify file inputs to
         the command.
 
@@ -48,8 +83,11 @@ class FileOutputSubcommand(Subcommand):
             default=None
         ))
 
+    # TODO - unsure how to specify a suitable return type. The mypy suggested was very specific to this method datastructure
+    # Tuple[Tuple[Tuple[str, str], Dict[Any, Union[str, Type[str]]]], Tuple[str, Dict[Any, str]]]
+    # Sequence[str, dict] does not work because then added to another Tuple in subclasses
     @classmethod
-    def other_args(cls):
+    def other_args(cls) -> Tuple[Tuple[Tuple[str, str], Dict[str, object]], Tuple[str, Dict[str, str]]]:
         ''' Return args for ``-o`` / ``--output`` to specify where output
         should be written, and for a ``--args`` to pass on any additional
         command line args to the subcommand.
@@ -86,7 +124,7 @@ class FileOutputSubcommand(Subcommand):
             )),
         )
 
-    def filename_from_route(self, route, ext):
+    def filename_from_route(self, route: str, ext: str) -> str:
         '''
 
         '''
@@ -97,7 +135,7 @@ class FileOutputSubcommand(Subcommand):
 
         return "%s.%s" % (base, ext)
 
-    def invoke(self, args):
+    def invoke(self, args: argparse.Namespace) -> None:
         '''
 
         '''
@@ -105,9 +143,9 @@ class FileOutputSubcommand(Subcommand):
         applications = build_single_handler_applications(args.files, argvs)
 
         if args.output is None:
-            outputs = []
+            outputs: List[str] = []
         else:
-            outputs = list(args.output) # copy so we can pop from it
+            outputs = list(args.output)  # copy so we can pop from it
 
         if len(outputs) > len(applications):
             die("--output/-o was given too many times (%d times for %d applications)" %
@@ -123,28 +161,71 @@ class FileOutputSubcommand(Subcommand):
 
             self.write_file(args, filename, doc)
 
-    def write_file(self, args, filename, doc):
+    def write_file(self, args: argparse.Namespace, filename: str, doc: Document) -> None:
         '''
 
         '''
+        def write_str(content: str, filename: str) -> None:
+            if filename == "-":
+                print(content)
+            else:
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(content)
+            self.after_write_file(args, filename, doc)
+
+        def write_bytes(content: bytes, filename: str) -> None:
+            if filename == "-":
+                sys.stdout.buffer.write(content)
+            else:
+                with open(filename, "wb") as f:
+                    f.write(content)
+            self.after_write_file(args, filename, doc)
+
         contents = self.file_contents(args, doc)
-        if filename == '-':
-            print(decode_utf8(contents))
+
+        if isinstance(contents, str):
+            write_str(contents, filename)
+        elif isinstance(contents, bytes):
+            write_bytes(contents, filename)
         else:
-            with io.open(filename, "w", encoding="utf-8") as file:
-                file.write(decode_utf8(contents))
-        self.after_write_file(args, filename, doc)
+            if filename == "-" or len(contents) <= 1:
+                def indexed(i: int) -> str:
+                    return filename
+            else:
+                def indexed(i: int) -> str:
+                    root, ext = splitext(filename)
+                    return f"{root}_{i}{ext}"
+
+            for i, content in enumerate(contents):
+                if isinstance(content, str):
+                    write_str(content, indexed(i))
+                elif isinstance(content, bytes):
+                    write_bytes(content, indexed(i))
 
     # can be overridden optionally
-    def after_write_file(self, args, filename, doc):
+    def after_write_file(self, args: argparse.Namespace, filename: str, doc: Document) -> None:
         '''
 
         '''
         pass
 
     @abstractmethod
-    def file_contents(self, args, doc):
-        ''' Subtypes must override this to return the contents of the output file for the given doc.
+    def file_contents(self, args: argparse.Namespace, doc: Document) -> Union[str, bytes, List[str], List[bytes]]:
+        ''' Subclasses must override this method to return the contents of the output file for the given doc.
+        subclassed methods return different types:
+        str: html, json
+        bytes: SVG, png
+
+        Raises:
+            NotImplementedError
 
         '''
-        raise NotImplementedError("file_contents")
+        raise NotImplementedError()
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

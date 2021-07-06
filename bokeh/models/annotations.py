@@ -1,38 +1,131 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Renderers for various kinds of annotations that can be added to
 Bokeh plots
 
 '''
-from __future__ import absolute_import
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from six import string_types
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
 
-from ..core.enums import (AngleUnits, Dimension, FontStyle, LegendClickPolicy, LegendLocation,
-                          Orientation, RenderMode, SpatialUnits, TextAlign)
+# Bokeh imports
+from ..core.enums import (
+    AngleUnits,
+    Dimension,
+    FontStyle,
+    LegendClickPolicy,
+    LegendLocation,
+    Orientation,
+    RenderMode,
+    SpatialUnits,
+    TextAlign,
+    TooltipAttachment,
+    VerticalAlign,
+)
 from ..core.has_props import abstract
-from ..core.properties import (Angle, AngleSpec, Auto, Bool, ColorSpec, Datetime, Dict, DistanceSpec, Either,
-                               Enum, Float, FontSizeSpec, Include, Instance, Int, List, NumberSpec, Override,
-                               Seq, String, StringSpec, Tuple, value)
-from ..core.property_mixins import FillProps, LineProps, TextProps
+from ..core.properties import (
+    Angle,
+    AngleSpec,
+    Auto,
+    Bool,
+    ColorSpec,
+    Datetime,
+    Dict,
+    Either,
+    Enum,
+    Float,
+    FontSizeSpec,
+    Include,
+    Instance,
+    Int,
+    List,
+    NumberSpec,
+    Override,
+    PropertyUnitsSpec,
+    Seq,
+    String,
+    StringSpec,
+    Tuple,
+    value,
+)
+from ..core.property_mixins import (
+    FillProps,
+    LineProps,
+    ScalarFillProps,
+    ScalarLineProps,
+    ScalarTextProps,
+    TextProps,
+)
 from ..core.validation import error
-from ..core.validation.errors import BAD_COLUMN_NAME, NON_MATCHING_DATA_SOURCES_ON_LEGEND_ITEM_RENDERERS
+from ..core.validation.errors import (
+    BAD_COLUMN_NAME,
+    NON_MATCHING_DATA_SOURCES_ON_LEGEND_ITEM_RENDERERS,
+)
 from ..model import Model
 from ..util.serialization import convert_datetime_type
-
 from .formatters import BasicTickFormatter, TickFormatter
 from .mappers import ContinuousColorMapper
 from .renderers import GlyphRenderer, Renderer
 from .sources import ColumnDataSource, DataSource
-from .tickers import BasicTicker, Ticker
+from .tickers import BasicTicker, ContinuousTicker
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Annotation',
+    'Arrow',
+    'Band',
+    'BoxAnnotation',
+    'ColorBar',
+    'Label',
+    'LabelSet',
+    'Legend',
+    'LegendItem',
+    'PolyAnnotation',
+    'Slope',
+    'Span',
+    'TextAnnotation',
+    'Title',
+    'Tooltip',
+    'ToolbarPanel',
+    'Whisker',
+)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+# This only exists to prevent a circular import.
+def _DEFAULT_ARROW():
+    from .arrow_heads import OpenHead
+    return OpenHead()
+
+# This only exists to prevent a circular import.
+def _DEFAULT_TEE():
+    from .arrow_heads import TeeHead
+    return TeeHead(level="underlay", size=10)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 @abstract
 class Annotation(Renderer):
     ''' Base class for all annotation models.
 
     '''
-
-    plot = Instance(".models.plots.Plot", help="""
-    The plot to which this annotation is attached.
-    """)
 
     level = Override(default="annotation")
 
@@ -42,13 +135,30 @@ class TextAnnotation(Annotation):
 
     '''
 
+    render_mode = Enum(RenderMode, default="canvas", help="""
+    Specifies whether the text is rendered as a canvas element or as a
+    CSS element overlaid on the canvas. The default mode is "canvas".
+
+    .. note::
+        The CSS labels won't be present in the output using the "save" tool.
+
+    .. warning::
+        Not all visual styling properties are supported if the render_mode is
+        set to "css". The border_line_dash property isn't fully supported and
+        border_line_dash_offset isn't supported at all. Setting text_alpha will
+        modify the opacity of the entire background box and border in addition
+        to the text. Finally, clipping Label annotations inside of the plot
+        area isn't supported in "css" mode.
+
+    """)
+
 class LegendItem(Model):
     '''
 
     '''
     def __init__(self, *args, **kwargs):
-        super(LegendItem, self).__init__(*args, **kwargs)
-        if isinstance(self.label, string_types):
+        super().__init__(*args, **kwargs)
+        if isinstance(self.label, str):
             # Allow convenience of setting label as a string
             self.label = value(self.label)
 
@@ -61,6 +171,18 @@ class LegendItem(Model):
     renderers = List(Instance(GlyphRenderer), help="""
     A list of the glyph renderers to draw in the legend. If ``label`` is a field,
     then all data_sources of renderers must be the same.
+    """)
+
+    index = Int(default=None, help="""
+    The column data index to use for drawing the representative items.
+
+    If None (the default), then Bokeh will automatically choose an index to
+    use. If the label does not refer to a data column name, this is typically
+    the first data point in the data source. Otherwise, if the label does
+    refer to a column name, the legend will have "groupby" behavior, and will
+    choose and display representative points from every "group" in the column.
+
+    If set to a number, Bokeh will use that number as the index in all cases.
     """)
 
     @error(NON_MATCHING_DATA_SOURCES_ON_LEGEND_ITEM_RENDERERS)
@@ -81,6 +203,8 @@ class LegendItem(Model):
 class Legend(Annotation):
     ''' Render informational legends for a plot.
 
+    See :ref:`userguide_plotting_legends` for information on plotting legends.
+
     '''
 
     location = Either(Enum(LegendLocation), Tuple(Float, Float), default="top_right", help="""
@@ -95,7 +219,23 @@ class Legend(Annotation):
     when they are drawn.
     """)
 
-    border_props = Include(LineProps, help="""
+    title = String(help="""
+    The title text to render.
+    """)
+
+    title_props = Include(ScalarTextProps, help="""
+    The %s values for the title text.
+    """)
+
+    title_text_font_size = Override(default="13px")
+
+    title_text_font_style = Override(default="italic")
+
+    title_standoff = Int(5, help="""
+    The distance (in pixels) to separate the title from the legend.
+    """)
+
+    border_props = Include(ScalarLineProps, help="""
     The %s for the legend border outline.
     """)
 
@@ -103,12 +243,14 @@ class Legend(Annotation):
 
     border_line_alpha = Override(default=0.5)
 
-    background_props = Include(FillProps, help="""
+    background_props = Include(ScalarFillProps, help="""
     The %s for the legend background style.
     """)
 
-    inactive_props = Include(FillProps, help="""
-    The %s for the legend background style when inactive.
+    inactive_props = Include(ScalarFillProps, help="""
+    The %s for the legend item style when inactive. These control an overlay
+    on the item that can be used to obscure it when the corresponding glyph
+    is inactive (e.g. by making it semi-transparent).
     """)
 
     click_policy = Enum(LegendClickPolicy, default="none", help="""
@@ -121,15 +263,15 @@ class Legend(Annotation):
 
     inactive_fill_color = Override(default="white")
 
-    inactive_fill_alpha = Override(default=0.9)
+    inactive_fill_alpha = Override(default=0.7)
 
-    label_props = Include(TextProps, help="""
+    label_props = Include(ScalarTextProps, help="""
     The %s for the legend labels.
     """)
 
     label_text_baseline = Override(default='middle')
 
-    label_text_font_size = Override(default={'value': '10pt'})
+    label_text_font_size = Override(default='13px')
 
     label_standoff = Int(5, help="""
     The distance (in pixels) to separate the label from its associated glyph.
@@ -161,7 +303,7 @@ class Legend(Annotation):
     """)
 
     spacing = Int(3, help="""
-    Amount of spacing (in pixles) between legend entries.
+    Amount of spacing (in pixels) between legend entries.
     """)
 
     items = List(Instance(LegendItem), help="""
@@ -194,6 +336,8 @@ class Legend(Annotation):
 
 class ColorBar(Annotation):
     ''' Render a color bar based on a color mapper.
+
+    See :ref:`userguide_plotting_color_bars` for information on plotting color bars.
 
     '''
 
@@ -229,11 +373,11 @@ class ColorBar(Annotation):
     The title text to render.
     """)
 
-    title_props = Include(TextProps, help="""
+    title_props = Include(ScalarTextProps, help="""
     The %s values for the title text.
     """)
 
-    title_text_font_size = Override(default={'value': "10pt"})
+    title_text_font_size = Override(default="13px")
 
     title_text_font_style = Override(default="italic")
 
@@ -241,12 +385,12 @@ class ColorBar(Annotation):
     The distance (in pixels) to separate the title from the color bar.
     """)
 
-    ticker = Instance(Ticker, default=lambda: BasicTicker(), help="""
+    ticker = Instance(ContinuousTicker, default=lambda: BasicTicker(), help="""
     A Ticker to use for computing locations of axis components.
     """)
 
     formatter = Instance(TickFormatter, default=lambda: BasicTickFormatter(), help="""
-    A TickFormatter to use for formatting the visual appearance of ticks.
+    A ``TickFormatter`` to use for formatting the visual appearance of ticks.
     """)
 
     major_label_overrides = Dict(Either(Float, String), String, default={}, help="""
@@ -258,8 +402,8 @@ class ColorBar(Annotation):
     A continuous color mapper containing a color palette to render.
 
     .. warning::
-        If the `low` and `high` attributes of the ColorMapper aren't set, ticks
-        and tick labels won't be rendered. Additionally, if a LogTicker is
+        If the `low` and `high` attributes of the ``ColorMapper`` aren't set, ticks
+        and tick labels won't be rendered. Additionally, if a ``LogTicker`` is
         passed to the `ticker` argument and either or both of the logarithms
         of `low` and `high` values of the color_mapper are non-numeric
         (i.e. `low=0`), the tick and tick labels won't be rendered.
@@ -273,7 +417,7 @@ class ColorBar(Annotation):
     Amount of padding (in pixels) between the color scale and color bar border.
     """)
 
-    major_label_props = Include(TextProps, help="""
+    major_label_props = Include(ScalarTextProps, help="""
     The %s of the major tick labels.
     """)
 
@@ -281,13 +425,13 @@ class ColorBar(Annotation):
 
     major_label_text_baseline = Override(default="middle")
 
-    major_label_text_font_size = Override(default={'value': "8pt"})
+    major_label_text_font_size = Override(default="11px")
 
     label_standoff = Int(5, help="""
     The distance (in pixels) to separate the tick labels from the color bar.
     """)
 
-    major_tick_props = Include(LineProps, help="""
+    major_tick_props = Include(ScalarLineProps, help="""
     The %s of the major ticks.
     """)
 
@@ -303,7 +447,7 @@ class ColorBar(Annotation):
     main plot area.
     """)
 
-    minor_tick_props = Include(LineProps, help="""
+    minor_tick_props = Include(ScalarLineProps, help="""
     The %s of the minor ticks.
     """)
 
@@ -319,19 +463,19 @@ class ColorBar(Annotation):
     main plot area.
     """)
 
-    bar_props = Include(LineProps, help="""
+    bar_props = Include(ScalarLineProps, help="""
     The %s for the color scale bar outline.
     """)
 
     bar_line_color = Override(default=None)
 
-    border_props = Include(LineProps, help="""
+    border_props = Include(ScalarLineProps, help="""
     The %s for the color bar border outline.
     """)
 
     border_line_color = Override(default=None)
 
-    background_props = Include(FillProps, help="""
+    background_props = Include(ScalarFillProps, help="""
     The %s for the color bar background style.
     """)
 
@@ -339,13 +483,10 @@ class ColorBar(Annotation):
 
     background_fill_alpha = Override(default=0.95)
 
-# This only exists to prevent a circular import.
-def _DEFAULT_ARROW():
-    from .arrow_heads import OpenHead
-    return OpenHead()
-
 class Arrow(Annotation):
-    ''' Render an arrow as an annotation.
+    ''' Render arrows as an annotation.
+
+    See :ref:`userguide_plotting_arrows` for information on plotting arrows.
 
     '''
 
@@ -363,7 +504,7 @@ class Arrow(Annotation):
     """)
 
     start = Instance('.models.arrow_heads.ArrowHead', default=None, help="""
-    Instance of ArrowHead.
+    Instance of ``ArrowHead``.
     """)
 
     x_end = NumberSpec(help="""
@@ -380,7 +521,7 @@ class Arrow(Annotation):
     """)
 
     end = Instance('.models.arrow_heads.ArrowHead', default=_DEFAULT_ARROW, help="""
-    Instance of ArrowHead.
+    Instance of ``ArrowHead``.
     """)
 
     body_props = Include(LineProps, use_prefix=False, help="""
@@ -391,18 +532,10 @@ class Arrow(Annotation):
     Local data source to use when rendering annotations on the plot.
     """)
 
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default y-range.
-    """)
-
 class BoxAnnotation(Annotation):
     ''' Render a shaded rectangular region as an annotation.
+
+    See :ref:`userguide_plotting_box_annotations` for information on plotting box annotations.
 
     '''
 
@@ -454,17 +587,7 @@ class BoxAnnotation(Annotation):
     by default.
     """)
 
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering box annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering box annotations on the plot. If unset, use the default y-range.
-    """)
-
-    line_props = Include(LineProps, use_prefix=False, help="""
+    line_props = Include(ScalarLineProps, use_prefix=False, help="""
     The %s values for the box.
     """)
 
@@ -472,7 +595,7 @@ class BoxAnnotation(Annotation):
 
     line_color = Override(default="#cccccc")
 
-    fill_props = Include(FillProps, use_prefix=False, help="""
+    fill_props = Include(ScalarFillProps, use_prefix=False, help="""
     The %s values for the box.
     """)
 
@@ -484,6 +607,9 @@ class BoxAnnotation(Annotation):
     Specifies whether the box is rendered as a canvas element or as an
     css element overlaid on the canvas. The default mode is "canvas".
 
+    .. note:
+        This property is deprecated and will be removed in bokeh 3.0.
+
     .. warning::
         The line_dash and line_dash_offset attributes aren't supported if
         the render_mode is set to "css"
@@ -493,39 +619,31 @@ class BoxAnnotation(Annotation):
 class Band(Annotation):
     ''' Render a filled area band along a dimension.
 
-    '''
+    See :ref:`userguide_plotting_bands` for information on plotting bands.
 
-    lower = DistanceSpec(help="""
+    '''
+    lower = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
     The coordinates of the lower portion of the filled area band.
     """)
 
-    upper = DistanceSpec(help="""
-    The coordinations of the upper portion of the filled area band.
+    upper = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
+    The coordinates of the upper portion of the filled area band.
     """)
 
-    base = DistanceSpec(help="""
+    base = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
     The orthogonal coordinates of the upper and lower values.
     """)
 
     dimension = Enum(Dimension, default='height', help="""
-    The direction of the band.
+    The direction of the band can be specified by setting this property
+    to "height" (``y`` direction) or "width" (``x`` direction).
     """)
 
     source = Instance(DataSource, default=lambda: ColumnDataSource(), help="""
     Local data source to use when rendering annotations on the plot.
     """)
 
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default y-range.
-    """)
-
-    line_props = Include(LineProps, use_prefix=False, help="""
+    line_props = Include(ScalarLineProps, use_prefix=False, help="""
     The %s values for the band.
     """)
 
@@ -533,7 +651,7 @@ class Band(Annotation):
 
     line_color = Override(default="#cccccc")
 
-    fill_props = Include(FillProps, use_prefix=False, help="""
+    fill_props = Include(ScalarFillProps, use_prefix=False, help="""
     The %s values for the band.
     """)
 
@@ -556,6 +674,8 @@ class Label(TextAnnotation):
     There are also standard text, fill, and line properties to control the
     appearance of the text, its background, as well as the rectangular bounding
     box border.
+
+    See :ref:`userguide_plotting_labels` for information on plotting labels.
 
     '''
 
@@ -615,51 +735,21 @@ class Label(TextAnnotation):
     distance in screen units from a given data position.
     """)
 
-    # TODO (bev) these should probably not be dataspec properties
-    text_props = Include(TextProps, use_prefix=False, help="""
+    text_props = Include(ScalarTextProps, use_prefix=False, help="""
     The %s values for the text.
     """)
 
-    # TODO (bev) these should probably not be dataspec properties
-    background_props = Include(FillProps, use_prefix=True, help="""
+    background_props = Include(ScalarFillProps, use_prefix=True, help="""
     The %s values for the text bounding box.
     """)
 
     background_fill_color = Override(default=None)
 
-    # TODO (bev) these should probably not be dataspec properties
-    border_props = Include(LineProps, use_prefix=True, help="""
+    border_props = Include(ScalarLineProps, use_prefix=True, help="""
     The %s values for the text bounding box.
     """)
 
     border_line_color = Override(default=None)
-
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen location when
-    rendering an annotation on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen location when
-    rendering an annotation on the plot. If unset, use the default y-range.
-    """)
-
-    render_mode = Enum(RenderMode, default="canvas", help="""
-    Specifies whether the text is rendered as a canvas element or as an
-    css element overlaid on the canvas. The default mode is "canvas".
-
-    .. note::
-        The CSS labels won't be present in the output using the "save" tool.
-
-    .. warning::
-        Not all visual styling properties are supported if the render_mode is
-        set to "css". The border_line_dash property isn't fully supported and
-        border_line_dash_offset isn't supported at all. Setting text_alpha will
-        modify the opacity of the entire background box and border in addition
-        to the text. Finally, clipping Label annotations inside of the plot
-        area isn't supported in "css" mode.
-
-    """)
 
 class LabelSet(TextAnnotation):
     ''' Render multiple text labels as annotations.
@@ -691,7 +781,7 @@ class LabelSet(TextAnnotation):
     """)
 
     x_units = Enum(SpatialUnits, default='data', help="""
-    The unit type for the xs attribute. Interpreted as "data space" units
+    The unit type for the ``xs`` attribute. Interpreted as "data space" units
     by default.
     """)
 
@@ -700,7 +790,7 @@ class LabelSet(TextAnnotation):
     """)
 
     y_units = Enum(SpatialUnits, default='data', help="""
-    The unit type for the ys attribute. Interpreted as "data space" units
+    The unit type for the ``ys`` attribute. Interpreted as "data space" units
     by default.
     """)
 
@@ -752,33 +842,6 @@ class LabelSet(TextAnnotation):
     Local data source to use when rendering annotations on the plot.
     """)
 
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default y-range.
-    """)
-
-    render_mode = Enum(RenderMode, default="canvas", help="""
-    Specifies whether the text is rendered as a canvas element or as an
-    css element overlaid on the canvas. The default mode is "canvas".
-
-    .. note::
-        The CSS labels won't be present in the output using the "save" tool.
-
-    .. warning::
-        Not all visual styling properties are supported if the render_mode is
-        set to "css". The border_line_dash property isn't fully supported and
-        border_line_dash_offset isn't supported at all. Setting text_alpha will
-        modify the opacity of the entire background box and border in addition
-        to the text. Finally, clipping Label annotations inside of the plot
-        area isn't supported in "css" mode.
-
-    """)
-
 class PolyAnnotation(Annotation):
     ''' Render a shaded polygonal region as an annotation.
 
@@ -789,7 +852,7 @@ class PolyAnnotation(Annotation):
     """)
 
     xs_units = Enum(SpatialUnits, default='data', help="""
-    The unit type for the xs attribute. Interpreted as "data space" units
+    The unit type for the ``xs`` attribute. Interpreted as "data space" units
     by default.
     """)
 
@@ -798,21 +861,11 @@ class PolyAnnotation(Annotation):
     """)
 
     ys_units = Enum(SpatialUnits, default='data', help="""
-    The unit type for the ys attribute. Interpreted as "data space" units
+    The unit type for the ``ys`` attribute. Interpreted as "data space" units
     by default.
     """)
 
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering box annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering box annotations on the plot. If unset, use the default y-range.
-    """)
-
-    line_props = Include(LineProps, use_prefix=False, help="""
+    line_props = Include(ScalarLineProps, use_prefix=False, help="""
     The %s values for the polygon.
     """)
 
@@ -820,7 +873,7 @@ class PolyAnnotation(Annotation):
 
     line_color = Override(default="#cccccc")
 
-    fill_props = Include(FillProps, use_prefix=False, help="""
+    fill_props = Include(ScalarFillProps, use_prefix=False, help="""
     The %s values for the polygon.
     """)
 
@@ -828,14 +881,38 @@ class PolyAnnotation(Annotation):
 
     fill_color = Override(default="#fff9ba")
 
+class Slope(Annotation):
+    """ Render a sloped line as an annotation.
+
+    See :ref:`userguide_plotting_slope` for information on plotting slopes.
+
+    """
+
+    gradient = Float(help="""
+    The gradient of the line, in data units
+    """)
+
+    y_intercept = Float(help="""
+    The y intercept of the line, in data units
+    """)
+
+    line_props = Include(ScalarLineProps, use_prefix=False, help="""
+    The %s values for the line.
+    """)
+
 class Span(Annotation):
     """ Render a horizontal or vertical line span.
+
+    See :ref:`userguide_plotting_spans` for information on plotting spans.
 
     """
 
     location = Float(help="""
     The location of the span, along ``dimension``.
-    """)
+
+    Datetime values are also accepted, but note that they are immediately
+    converted to milliseconds-since-epoch.
+    """).accepts(Datetime, convert_datetime_type)
 
     location_units = Enum(SpatialUnits, default='data', help="""
     The unit type for the location attribute. Interpreted as "data space"
@@ -843,22 +920,16 @@ class Span(Annotation):
     """)
 
     dimension = Enum(Dimension, default='width', help="""
-    The direction of the span.
-    """)
-
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default y-range.
+    The direction of the span can be specified by setting this property
+    to "height" (``y`` direction) or "width" (``x`` direction).
     """)
 
     render_mode = Enum(RenderMode, default="canvas", help="""
-    Specifies whether the span is rendered as a canvas element or as an
-    css element overlaid on the canvas. The default mode is "canvas".
+    Specifies whether the span is rendered as a canvas element or as a
+    CSS element overlaid on the canvas. The default mode is "canvas".
+
+    .. note:
+        This property is deprecated and will be removed in bokeh 3.0.
 
     .. warning::
         The line_dash and line_dash_offset attributes aren't supported if
@@ -866,12 +937,14 @@ class Span(Annotation):
 
     """)
 
-    line_props = Include(LineProps, use_prefix=False, help="""
+    line_props = Include(ScalarLineProps, use_prefix=False, help="""
     The %s values for the span.
     """)
 
 class Title(TextAnnotation):
     ''' Render a single title box as an annotation.
+
+    See :ref:`userguide_plotting_titles` for information on plotting titles.
 
     '''
 
@@ -879,9 +952,18 @@ class Title(TextAnnotation):
     The text value to render.
     """)
 
-    align = Enum(TextAlign, default='left', help="""
-    Location to align the title text.
+    vertical_align = Enum(VerticalAlign, default='bottom', help="""
+    Alignment of the text in its enclosing space, *across* the direction of the text.
+    """)
 
+    align = Enum(TextAlign, default='left', help="""
+    Alignment of the text in its enclosing space, *along* the direction of the text.
+    """)
+
+    text_line_height = Float(default=1.0, help="""
+    How much additional space should be allocated for the title. The value is provided
+    as a number, but should be treated as a percentage of font size. The default is
+    100%, which means no additional space will be used.
     """)
 
     offset = Float(default=0, help="""
@@ -901,7 +983,7 @@ class Title(TextAnnotation):
 
     """)
 
-    text_font_size = FontSizeSpec(default=value("10pt"))
+    text_font_size = FontSizeSpec(default="13px")
 
     text_font_style = Enum(FontStyle, default="bold", help="""
     A style to use for rendering text.
@@ -936,34 +1018,17 @@ class Title(TextAnnotation):
 
     """)
 
-    background_props = Include(FillProps, use_prefix=True, help="""
+    background_props = Include(ScalarFillProps, use_prefix=True, help="""
     The %s values for the text bounding box.
     """)
 
     background_fill_color = Override(default=None)
 
-    border_props = Include(LineProps, use_prefix=True, help="""
+    border_props = Include(ScalarLineProps, use_prefix=True, help="""
     The %s values for the text bounding box.
     """)
 
     border_line_color = Override(default=None)
-
-    render_mode = Enum(RenderMode, default="canvas", help="""
-    Specifies whether the text is rendered as a canvas element or as an
-    css element overlaid on the canvas. The default mode is "canvas".
-
-    .. note::
-        The CSS labels won't be present in the output using the "save" tool.
-
-    .. warning::
-        Not all visual styling properties are supported if the render_mode is
-        set to "css". The border_line_dash property isn't fully supported and
-        border_line_dash_offset isn't supported at all. Setting text_alpha will
-        modify the opacity of the entire background box and border in addition
-        to the text. Finally, clipping Label annotations inside of the plot
-        area isn't supported in "css" mode.
-
-    """)
 
 class Tooltip(Annotation):
     ''' Render a tooltip.
@@ -975,66 +1040,58 @@ class Tooltip(Annotation):
     '''
     level = Override(default="overlay")
 
-    attachment = Enum("horizontal", "vertical", "left", "right", "above", "below", help="""
-    Whether the tooltip should display to the left or right off the cursor
+    attachment = Enum(TooltipAttachment, help="""
+    Whether the tooltip should be displayed to the left or right of the cursor
     position or above or below it, or if it should be automatically placed
     in the horizontal or vertical dimension.
     """)
 
     inner_only = Bool(default=True, help="""
     Whether to display outside a central plot frame area.
+
+    .. note:
+        This property is deprecated and will be removed in bokeh 3.0.
+
     """)
 
     show_arrow = Bool(default=True, help="""
-    Whether tooltip's arrow should be showed.
+    Whether tooltip's arrow should be shown.
     """)
-
-# This only exists to prevent a circular import.
-def _DEFAULT_TEE():
-    from .arrow_heads import TeeHead
-    return TeeHead(level="underlay", size=10)
 
 class Whisker(Annotation):
     ''' Render a whisker along a dimension.
 
+    See :ref:`userguide_plotting_whiskers` for information on plotting whiskers.
+
     '''
 
-    lower = DistanceSpec(help="""
+    lower = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
     The coordinates of the lower end of the whiskers.
     """)
 
     lower_head = Instance('.models.arrow_heads.ArrowHead', default=_DEFAULT_TEE, help="""
-    Instance of ArrowHead.
+    Instance of ``ArrowHead``.
     """)
 
-    upper = DistanceSpec(help="""
-    The coordinations of the upper end of the whiskers.
+    upper = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
+    The coordinates of the upper end of the whiskers.
     """)
 
     upper_head = Instance('.models.arrow_heads.ArrowHead', default=_DEFAULT_TEE, help="""
-    Instance of ArrowHead.
+    Instance of ``ArrowHead``.
     """)
 
-    base = DistanceSpec(help="""
+    base = PropertyUnitsSpec(default=None, units_type=Enum(SpatialUnits), units_default="data", help="""
     The orthogonal coordinates of the upper and lower values.
     """)
 
     dimension = Enum(Dimension, default='height', help="""
-    The direction of the band.
+    The direction of the whisker can be specified by setting this property
+    to "height" (``y`` direction) or "width" (``x`` direction).
     """)
 
     source = Instance(DataSource, default=lambda: ColumnDataSource(), help="""
     Local data source to use when rendering annotations on the plot.
-    """)
-
-    x_range_name = String('default', help="""
-    A particular (named) x-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default x-range.
-    """)
-
-    y_range_name = String('default', help="""
-    A particular (named) y-range to use for computing screen locations when
-    rendering annotations on the plot. If unset, use the default y-range.
     """)
 
     line_props = Include(LineProps, use_prefix=False, help="""
@@ -1042,3 +1099,17 @@ class Whisker(Annotation):
     """)
 
     level = Override(default="underlay")
+
+class ToolbarPanel(Annotation): # TODO: this shouldn't be an annotation
+
+    toolbar = Instance(".models.tools.Toolbar", help="""
+    A toolbar to display.
+    """)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

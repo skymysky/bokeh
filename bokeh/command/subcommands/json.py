@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 '''
 To generate the serialized JSON representation for a Bokeh application
 from a single Python script, pass the script name to ``bokeh json`` on the
@@ -28,9 +34,35 @@ indentation level with the ``--indent`` argument:
     bokeh json app_script.py --indent=2
 
 '''
-from __future__ import print_function
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+from argparse import Namespace
+
+# Bokeh imports
+from ...document import Document
 from .file_output import FileOutputSubcommand
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'JSON',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class JSON(FileOutputSubcommand):
     ''' Subcommand to output applications as serialized JSON
@@ -58,8 +90,20 @@ class JSON(FileOutputSubcommand):
 
     ) + FileOutputSubcommand.other_args()
 
-    def file_contents(self, args, doc):
+    def file_contents(self, args: Namespace, doc: Document) -> str:
         '''
 
         '''
         return doc.to_json_string(indent=args.indent)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

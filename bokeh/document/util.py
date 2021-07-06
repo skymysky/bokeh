@@ -1,10 +1,48 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide ancillary utility functions useful for manipulating Bokeh
 documents.
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+from typing import Dict
+
+# Bokeh imports
+from ..core.has_props import HasProps
 from ..model import get_class
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'initialize_references_json',
+    'instantiate_references_json',
+    'references_json',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 def initialize_references_json(references_json, references, setter=None):
     ''' Given a JSON representation of the models in a graph, and new model
@@ -41,9 +79,15 @@ def initialize_references_json(references_json, references, setter=None):
 
         instance = references[obj_id]
 
+        # We want to avoid any Model specific initialization that happens with
+        # Slider(...) when reconstituting from JSON, but we do need to perform
+        # general HasProps machinery that sets properties, so call it explicitly
+        if not instance._initialized:
+            HasProps.__init__(instance)
+
         instance.update_from_json(obj_attrs, models=references, setter=setter)
 
-def instantiate_references_json(references_json):
+def instantiate_references_json(references_json, existing_instances: Dict[str, HasProps]):
     ''' Given a JSON representation of all the models in a graph, return a
     dict of new model objects.
 
@@ -62,11 +106,14 @@ def instantiate_references_json(references_json):
         obj_id = obj['id']
         obj_type = obj.get('subtype', obj['type'])
 
-        cls = get_class(obj_type)
-        instance = cls(id=obj_id, _block_events=True)
-        if instance is None:
-            raise RuntimeError('Error loading model from JSON (type: %s, id: %s)' % (obj_type, obj_id))
-        references[instance._id] = instance
+        if obj_id in existing_instances:
+            references[obj_id] = existing_instances[obj_id]
+        else:
+            cls = get_class(obj_type)
+            instance = cls.__new__(cls, id=obj_id)
+            if instance is None:
+                raise RuntimeError(f"Error loading model from JSON (type: {obj_type}, id: {obj_id})")
+            references[instance.id] = instance
 
     return references
 
@@ -85,8 +132,16 @@ def references_json(references):
 
     references_json = []
     for r in references:
-        ref = r.ref
-        ref['attributes'] = r._to_json_like(include_defaults=False)
-        references_json.append(ref)
+        struct = r.struct
+        struct['attributes'] = r._to_json_like(include_defaults=False)
+        references_json.append(struct)
 
     return references_json
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

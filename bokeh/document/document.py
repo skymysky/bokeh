@@ -1,9 +1,15 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide the ``Document`` class, which is a container for Bokeh Models to
 be reflected to the client side BokehJS library.
 
 As a concrete example, consider a column layout with ``Slider`` and ``Select``
 widgets, and a plot with some tools, an axis and grid, and a glyph renderer
-for circles. A simplified representation oh this document might look like the
+for circles. A simplified representation of this document might look like the
 figure below:
 
 .. figure:: /_images/document.svg
@@ -14,38 +20,75 @@ figure below:
     glyphs, etc.) that can be serialized as a single collection.
 
 '''
-from __future__ import absolute_import
 
-import logging
-logger = logging.getLogger(__file__)
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from collections import defaultdict
-from json import loads
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import sys
+from collections import defaultdict
+from functools import wraps
+from inspect import isclass
+from json import loads
+from typing import Any, Callable, Dict, List
 
+# External imports
 import jinja2
-from six import string_types
 
+# Bokeh imports
 from ..core.enums import HoldPolicy
 from ..core.json_encoder import serialize_json
 from ..core.query import find
 from ..core.templates import FILE
 from ..core.validation import check_integrity
-from ..events import Event
+from ..events import _CONCRETE_EVENT_CLASSES, DocumentEvent, Event
+from ..model import Model
+from ..themes import Theme, built_in_themes
 from ..themes import default as default_theme
-from ..themes import Theme
 from ..util.callback_manager import _check_callback
 from ..util.datatypes import MultiValuedDict
-from ..util.future import wraps
 from ..util.version import __version__
-
-from .events import ModelChangedEvent, RootAddedEvent, RootRemovedEvent, SessionCallbackAdded, SessionCallbackRemoved, TitleChangedEvent
+from .events import (
+    ModelChangedEvent,
+    RootAddedEvent,
+    RootRemovedEvent,
+    SessionCallbackAdded,
+    SessionCallbackRemoved,
+    TitleChangedEvent,
+)
 from .locking import UnlockedDocumentProxy
-from .util import initialize_references_json, instantiate_references_json, references_json
+from .util import (
+    initialize_references_json,
+    instantiate_references_json,
+    references_json,
+)
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
 DEFAULT_TITLE = "Bokeh Application"
 
-class Document(object):
+__all__ = (
+    'Document',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class Document:
     ''' The basic unit of serialization for Bokeh.
 
     Document instances collect Bokeh models (e.g. plots, layouts, widgets,
@@ -56,6 +99,9 @@ class Document(object):
     of serialization for Bokeh.
 
     '''
+
+    _message_callbacks: Dict[str, List[Callable[[Any], None]]]
+
     def __init__(self, **kwargs):
         self._roots = list()
         self._theme = kwargs.pop('theme', default_theme)
@@ -67,7 +113,10 @@ class Document(object):
         self._all_models_by_name = MultiValuedDict()
         self._all_former_model_ids = set()
         self._callbacks = {}
-        self._session_callbacks = {}
+        self._event_callbacks = {}
+        self._message_callbacks = {}
+        self._session_destroyed_callbacks = set()
+        self._session_callbacks = set()
         self._session_context = None
         self._modules = []
         self._template_variables = {}
@@ -76,6 +125,11 @@ class Document(object):
 
         # set of models subscribed to user events
         self._subscribed_models = defaultdict(set)
+        self.on_message("bokeh_event", self.apply_json_event)
+
+        self._callback_objs_by_callable = {self.add_next_tick_callback: defaultdict(set),
+                                           self.add_periodic_callback: defaultdict(set),
+                                           self.add_timeout_callback: defaultdict(set)}
 
     # Properties --------------------------------------------------------------
 
@@ -91,7 +145,18 @@ class Document(object):
         ''' A list of all the session callbacks on this document.
 
         '''
-        return list(self._session_callbacks.values())
+        return list(self._session_callbacks)
+
+    @property
+    def session_destroyed_callbacks(self):
+        ''' A list of all the on_session_destroyed callbacks on this document.
+
+        '''
+        return self._session_destroyed_callbacks
+
+    @session_destroyed_callbacks.setter
+    def session_destroyed_callbacks(self, callbacks):
+        self._session_destroyed_callbacks = callbacks
 
     @property
     def session_context(self):
@@ -109,8 +174,8 @@ class Document(object):
 
     @template.setter
     def template(self, template):
-        if not isinstance(template, jinja2.Template):
-            raise ValueError("Document templates must be Jinja2 Templates")
+        if not isinstance(template, (jinja2.Template, str)):
+            raise ValueError("document template must be Jinja2 template or a string")
         self._template = template
 
     @property
@@ -138,11 +203,23 @@ class Document(object):
     def theme(self, theme):
         if theme is None:
             theme = default_theme
-        if not isinstance(theme, Theme):
-            raise ValueError("Theme must be an instance of the Theme class")
+
         if self._theme is theme:
             return
-        self._theme = theme
+
+        if isinstance(theme, str):
+            try:
+                self._theme = built_in_themes[theme]
+            except KeyError:
+                raise ValueError(
+                    "{0} is not a built-in theme; available themes are "
+                    "{1}".format(theme, ', '.join(built_in_themes.keys()))
+                )
+        elif isinstance(theme, Theme):
+            self._theme = theme
+        else:
+            raise ValueError("Theme must be a string or an instance of the Theme class")
+
         for model in self._all_models.values():
             self._theme.apply_to_model(model)
 
@@ -170,7 +247,7 @@ class Document(object):
                 A callback function to execute on the next tick.
 
         Returns:
-            NextTickCallback :
+            NextTickCallback : can be used with ``remove_next_tick_callback``
 
         .. note::
             Next tick callbacks only work within the context of a Bokeh server
@@ -180,7 +257,7 @@ class Document(object):
         '''
         from ..server.callbacks import NextTickCallback
         cb = NextTickCallback(self, None)
-        return self._add_session_callback(cb, callback, one_shot=True)
+        return self._add_session_callback(cb, callback, one_shot=True, originator=self.add_next_tick_callback)
 
     def add_periodic_callback(self, callback, period_milliseconds):
         ''' Add a callback to be invoked on a session periodically.
@@ -193,7 +270,7 @@ class Document(object):
                 Number of milliseconds between each callback execution.
 
         Returns:
-            PeriodicCallback :
+            PeriodicCallback : can be used with ``remove_periodic_callback``
 
         .. note::
             Periodic callbacks only work within the context of a Bokeh server
@@ -205,7 +282,7 @@ class Document(object):
         cb = PeriodicCallback(self,
                               None,
                               period_milliseconds)
-        return self._add_session_callback(cb, callback, one_shot=False)
+        return self._add_session_callback(cb, callback, one_shot=False, originator=self.add_periodic_callback)
 
     def add_root(self, model, setter=None):
         ''' Add a model as a root of this Document.
@@ -254,7 +331,7 @@ class Document(object):
                 Number of milliseconds before callback execution.
 
         Returns:
-            TimeoutCallback :
+            TimeoutCallback : can be used with ``remove_timeout_callback``
 
         .. note::
             Timeout callbacks only work within the context of a Bokeh server
@@ -266,15 +343,19 @@ class Document(object):
         cb = TimeoutCallback(self,
                              None,
                              timeout_milliseconds)
-        return self._add_session_callback(cb, callback, one_shot=True)
+        return self._add_session_callback(cb, callback, one_shot=True, originator=self.add_timeout_callback)
 
     def apply_json_event(self, json):
-        event = loads(json, object_hook=Event.decode_json)
+        event = Event.decode_json(json)
         if not isinstance(event, Event):
-            logger.warn('Could not decode event json: %s' % json)
+            log.warning('Could not decode event json: %s' % json)
         else:
-            for obj in self._subscribed_models[event.event_name]:
-                obj._trigger_event(event)
+            subscribed = self._subscribed_models[event.event_name].copy()
+            for model in subscribed:
+                model._trigger_event(event)
+
+        for cb in self._event_callbacks.get(event.event_name, []):
+            cb(event)
 
     def apply_json_patch(self, patch, setter=None):
         ''' Apply a JSON patch object and process any resulting events.
@@ -300,12 +381,7 @@ class Document(object):
         '''
         references_json = patch['references']
         events_json = patch['events']
-        references = instantiate_references_json(references_json)
-
-        # Use our existing model instances whenever we have them
-        for obj in references.values():
-            if obj._id in self._all_models:
-                references[obj._id] = self._all_models[obj._id]
+        references = instantiate_references_json(references_json, self._all_models)
 
         # The model being changed isn't always in references so add it in
         for event_json in events_json:
@@ -314,17 +390,19 @@ class Document(object):
                 if model_id in self._all_models:
                     references[model_id] = self._all_models[model_id]
 
-        initialize_references_json(references_json, references)
+        initialize_references_json(references_json, references, setter)
 
         for event_json in events_json:
+            if event_json['kind'] == 'MessageSent':
+                self._trigger_on_message(event_json["msg_type"], event_json["msg_data"])
 
-            if event_json['kind'] == 'ModelChanged':
+            elif event_json['kind'] == 'ModelChanged':
                 patched_id = event_json['model']['id']
                 if patched_id not in self._all_models:
                     if patched_id not in self._all_former_model_ids:
                         raise RuntimeError("Cannot apply patch to %s which is not in the document" % (str(patched_id)))
                     else:
-                        logger.warn("Cannot apply patch to %s which is not in the document anymore" % (str(patched_id)))
+                        log.debug("Cannot apply patch to %s which is not in the document anymore. This is usually harmless" % (str(patched_id)))
                         break
                 patched_obj = self._all_models[patched_id]
                 attr = event_json['attr']
@@ -345,7 +423,7 @@ class Document(object):
                     raise RuntimeError("Cannot stream to %s which is not in the document" % (str(source_id)))
                 source = self._all_models[source_id]
                 data = event_json['data']
-                rollover = event_json['rollover']
+                rollover = event_json.get('rollover', None)
                 source._stream(data, rollover, setter)
 
             elif event_json['kind'] == 'ColumnsPatched':
@@ -400,6 +478,26 @@ class Document(object):
         finally:
             self._pop_all_models_freeze()
 
+    def destroy(self, session):
+        self.remove_on_change(session)
+
+        # probably better to implement a destroy protocol on models to
+        # untangle everything, then the collect below might not be needed
+        for m in self._all_models.values():
+            m._document = None
+            del m
+
+        self._roots = []
+        self._all_models = None
+        self._all_models_by_name = None
+        self._theme = None
+        self._template = None
+        self._session_context = None
+        self.delete_modules()
+
+        import gc
+        gc.collect()
+
     def delete_modules(self):
         ''' Clean up after any modules created by this Document when its session is
         destroyed.
@@ -408,7 +506,7 @@ class Document(object):
         from gc import get_referrers
         from types import FrameType
 
-        logger.debug("Deleting %s modules for %s" % (len(self._modules), self))
+        log.debug("Deleting %s modules for %s" % (len(self._modules), self))
 
         for module in self._modules:
 
@@ -424,11 +522,11 @@ class Document(object):
             # leaked. Here we perform a detailed check that the only referrers are expected
             # ones. Otherwise issue an error log message with details.
             referrers = get_referrers(module)
-            referrers = [x for x in referrers if x is not sys.modules]
-            referrers = [x for x in referrers if x is not self._modules]
+            referrers = [x for x in referrers if x is not sys.modules]  # lgtm [py/comparison-using-is]
+            referrers = [x for x in referrers if x is not self._modules]  # lgtm [py/comparison-using-is]
             referrers = [x for x in referrers if not isinstance(x, FrameType)]
             if len(referrers) != 0:
-                logger.error("Module %r has extra unexpected referrers! This could indicate a serious memory leak. Extra referrers: %r" % (module, referrers))
+                log.error("Module %r has extra unexpected referrers! This could indicate a serious memory leak. Extra referrers: %r" % (module, referrers))
 
             # remove the reference from sys.modules
             if module.__name__ in sys.modules:
@@ -454,7 +552,7 @@ class Document(object):
         root_ids = roots_json['root_ids']
         references_json = roots_json['references']
 
-        references = instantiate_references_json(references_json)
+        references = instantiate_references_json(references_json, {})
         initialize_references_json(references_json, references)
 
         doc = Document()
@@ -546,7 +644,7 @@ class Document(object):
 
         '''
         if self._hold is not None and self._hold != policy:
-            logger.warn("hold already active with '%s', ignoring '%s'" % (self._hold, policy))
+            log.warning("hold already active with '%s', ignoring '%s'" % (self._hold, policy))
             return
         if policy not in HoldPolicy:
             raise ValueError("Unknown hold policy %r" % policy)
@@ -569,6 +667,44 @@ class Document(object):
         for event in events:
             self._trigger_on_change(event)
 
+    def on_message(self, msg_type: str, callback: Callable[[Any], None]) -> None:
+        message_callbacks = self._message_callbacks.get(msg_type, None)
+        if message_callbacks is None:
+            self._message_callbacks[msg_type] = [callback]
+        elif callback not in message_callbacks:
+            message_callbacks.append(callback)
+
+    def remove_on_message(self, msg_type: str, callback: Callable[[Any], None]) -> None:
+        message_callbacks = self._message_callbacks.get(msg_type, None)
+        if message_callbacks is not None and callback in message_callbacks:
+            message_callbacks.remove(callback)
+
+    def _trigger_on_message(self, msg_type: str, msg_data: Any) -> None:
+        message_callbacks = self._message_callbacks.get(msg_type, None)
+        if message_callbacks is not None:
+            for cb in message_callbacks:
+                cb(msg_data)
+
+    def on_event(self, event, *callbacks):
+        ''' Provide callbacks to invoke if a bokeh event is received.
+
+        '''
+        if not isinstance(event, str) and issubclass(event, Event):
+            event = event.event_name
+
+        if not issubclass(_CONCRETE_EVENT_CLASSES[event], DocumentEvent):
+            raise ValueError("Document.on_event may only be used to subscribe "
+                             "to events of type DocumentEvent. To subscribe "
+                             "to a ModelEvent use the Model.on_event method.")
+
+        for callback in callbacks:
+            _check_callback(callback, ('event',), what='Event callback')
+
+        if event not in self._event_callbacks:
+            self._event_callbacks[event] = [cb for cb in callbacks]
+        else:
+            self._event_callbacks[event].extend(callbacks)
+
     def on_change(self, *callbacks):
         ''' Provide callbacks to invoke if the document or any Model reachable
         from its roots changes.
@@ -586,17 +722,29 @@ class Document(object):
         if not receiver in self._callbacks:
             self._callbacks[receiver] = lambda event: event.dispatch(receiver)
 
-    def remove_next_tick_callback(self, callback):
+    def on_session_destroyed(self, *callbacks):
+        ''' Provide callbacks to invoke when the session serving the Document
+        is destroyed
+
+        '''
+        for callback in callbacks:
+            _check_callback(callback, ('session_context',))
+            self._session_destroyed_callbacks.add(callback)
+
+    def remove_next_tick_callback(self, callback_obj):
         ''' Remove a callback added earlier with ``add_next_tick_callback``.
+
+        Args:
+            callback_obj : a value returned from ``add_next_tick_callback``
 
         Returns:
             None
 
         Raises:
-            KeyError, if the callback was never added
+            ValueError, if the callback was never added or has already been run or removed
 
         '''
-        self._remove_session_callback(callback)
+        self._remove_session_callback(callback_obj, self.add_next_tick_callback)
 
     def remove_on_change(self, *callbacks):
         ''' Remove a callback added earlier with ``on_change``.
@@ -608,17 +756,20 @@ class Document(object):
         for callback in callbacks:
             del self._callbacks[callback]
 
-    def remove_periodic_callback(self, callback):
+    def remove_periodic_callback(self, callback_obj):
         ''' Remove a callback added earlier with ``add_periodic_callback``
+
+        Args:
+            callback_obj : a value returned from ``add_periodic_callback``
 
         Returns:
             None
 
         Raises:
-            KeyError, if the callback was never added
+            ValueError, if the callback was never added or has already been removed
 
         '''
-        self._remove_session_callback(callback)
+        self._remove_session_callback(callback_obj, self.add_periodic_callback)
 
     def remove_root(self, model, setter=None):
         ''' Remove a model as root model from this Document.
@@ -652,17 +803,20 @@ class Document(object):
             self._pop_all_models_freeze()
         self._trigger_on_change(RootRemovedEvent(self, model, setter))
 
-    def remove_timeout_callback(self, callback):
+    def remove_timeout_callback(self, callback_obj):
         ''' Remove a callback added earlier with ``add_timeout_callback``.
+
+        Args:
+            callback_obj : a value returned from ``add_timeout_callback``
 
         Returns:
             None
 
         Raises:
-            KeyError, if the callback was never added
+            ValueError, if the callback was never added or has already been run or removed
 
         '''
-        self._remove_session_callback(callback)
+        self._remove_session_callback(callback_obj, self.add_timeout_callback)
 
     def replace_with_json(self, json):
         ''' Overwrite everything in this document with the JSON-encoded
@@ -728,6 +882,8 @@ class Document(object):
             None
 
         '''
+        if isclass(selector) and issubclass(selector, Model):
+            selector = dict(type=selector)
         for obj in self.select(selector):
             for key, val in updates.items():
                 setattr(obj, key, val)
@@ -745,7 +901,7 @@ class Document(object):
         doc_json = self.to_json_string()
         return loads(doc_json)
 
-    def to_json_string(self, indent=None):
+    def to_json_string(self, indent=None) -> str:
         ''' Convert the document to a JSON string.
 
         Args:
@@ -758,7 +914,7 @@ class Document(object):
         '''
         root_ids = []
         for r in self._roots:
-            root_ids.append(r._id)
+            root_ids.append(r.id)
 
         root_references = self._all_models.values()
 
@@ -786,7 +942,7 @@ class Document(object):
 
     # Private methods ---------------------------------------------------------
 
-    def _add_session_callback(self, callback_obj, callback, one_shot):
+    def _add_session_callback(self, callback_obj, callback, one_shot, originator):
         ''' Internal implementation for adding session callbacks.
 
         Args:
@@ -808,23 +964,19 @@ class Document(object):
             ValueError, if the callback has been previously added
 
         '''
-        if callback in self._session_callbacks:
-            raise ValueError("callback has already been added")
-
         if one_shot:
             @wraps(callback)
             def remove_then_invoke(*args, **kwargs):
-                if callback in self._session_callbacks:
-                    obj = self._session_callbacks[callback]
-                    if obj is callback_obj:
-                        self._remove_session_callback(callback)
+                if callback_obj in self._session_callbacks:
+                    self._remove_session_callback(callback_obj, originator)
                 return callback(*args, **kwargs)
             actual_callback = remove_then_invoke
         else:
             actual_callback = callback
 
         callback_obj._callback = self._wrap_with_self_as_curdoc(actual_callback)
-        self._session_callbacks[callback] = callback_obj
+        self._session_callbacks.add(callback_obj)
+        self._callback_objs_by_callable[originator][callback].add(callback_obj)
 
         # emit event so the session is notified of the new callback
         self._trigger_on_change(SessionCallbackAdded(self, callback_obj))
@@ -887,7 +1039,7 @@ class Document(object):
             return False
         if field not in selector:
             return False
-        return isinstance(selector[field], string_types)
+        return isinstance(selector[field], str)
 
     def _notify_change(self, model, attr, old, new, hint=None, setter=None, callback_invoker=None):
         ''' Called by Model when it changes
@@ -936,20 +1088,20 @@ class Document(object):
         recomputed = {}
         recomputed_by_name = MultiValuedDict()
         for m in new_all_models_set:
-            recomputed[m._id] = m
+            recomputed[m.id] = m
             if m.name is not None:
                 recomputed_by_name.add_value(m.name, m)
         for d in to_detach:
-            self._all_former_model_ids.add(d._id)
+            self._all_former_model_ids.add(d.id)
             d._detach_document()
         for a in to_attach:
             a._attach_document(self)
         self._all_models = recomputed
         self._all_models_by_name = recomputed_by_name
 
-    def _remove_session_callback(self, callback):
-        ''' Remove a callback added earlier with ``add_periodic_callback``
-        or ``add_timeout_callback``.
+    def _remove_session_callback(self, callback_obj, originator):
+        ''' Remove a callback added earlier with ``add_periodic_callback``,
+        ``add_timeout_callback``, or ``add_next_tick_callback``.
 
         Returns:
             None
@@ -958,11 +1110,21 @@ class Document(object):
             KeyError, if the callback was never added
 
         '''
-        if callback not in self._session_callbacks:
+        try:
+            callback_objs = [callback_obj]
+            self._session_callbacks.remove(callback_obj)
+            for cb, cb_objs in list(self._callback_objs_by_callable[originator].items()):
+                try:
+                    cb_objs.remove(callback_obj)
+                    if not cb_objs:
+                        del self._callback_objs_by_callable[originator][cb]
+                except KeyError:
+                    pass
+        except KeyError:
             raise ValueError("callback already ran or was already removed, cannot be removed again")
-        cb = self._session_callbacks.pop(callback)
         # emit event so the session is notified and can remove the callback
-        self._trigger_on_change(SessionCallbackRemoved(self, cb))
+        for callback_obj in callback_objs:
+            self._trigger_on_change(SessionCallbackRemoved(self, callback_obj))
 
     def _set_title(self, title, setter=None):
         '''
@@ -1050,3 +1212,11 @@ def _combine_document_events(new_event, old_events):
 
     # no combination was possible
     old_events.append(new_event)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

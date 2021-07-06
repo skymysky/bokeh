@@ -1,29 +1,46 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provides the ``ServerSession`` class.
 
 '''
-from __future__ import absolute_import
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+import inspect
 import time
 
-from tornado import gen, locks
+# External imports
+from tornado import locks
 
-from ..util.tornado import yield_for_all_futures
-
+# Bokeh imports
+from ..util.token import generate_jwt_token
 from .callbacks import _DocumentCallbackGroup
 
-def current_time():
-    '''Return the time in milliseconds since the epoch as a floating
-       point number.
-    '''
-    try:
-        # python >=3.3 only
-        return time.monotonic() * 1000
-    except:
-        # if your python is old, don't set your clock backward!
-        return time.time() * 1000
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'current_time',
+    'ServerSession',
+)
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
 
 def _needs_document_lock(func):
     '''Decorator that adds the necessary locking and post-processing
@@ -31,21 +48,27 @@ def _needs_document_lock(func):
        method on ServerSession and transforms it into a coroutine
        if it wasn't already.
     '''
-    @gen.coroutine
-    def _needs_document_lock_wrapper(self, *args, **kwargs):
+    async def _needs_document_lock_wrapper(self, *args, **kwargs):
         # while we wait for and hold the lock, prevent the session
         # from being discarded. This avoids potential weirdness
         # with the session vanishing in the middle of some async
         # task.
+        if self.destroyed:
+            log.debug("Ignoring locked callback on already-destroyed session.")
+            return None
         self.block_expiration()
         try:
-            with (yield self._lock.acquire()):
+            with await self._lock.acquire():
                 if self._pending_writes is not None:
                     raise RuntimeError("internal class invariant violated: _pending_writes " + \
                                        "should be None if lock is not held")
                 self._pending_writes = []
                 try:
-                    result = yield yield_for_all_futures(func(self, *args, **kwargs))
+                    result = func(self, *args, **kwargs)
+                    if inspect.isawaitable(result):
+                        # Note that this must not be outside of the critical section.
+                        # Otherwise, the async callback will be ran without document locking.
+                        result = await result
                 finally:
                     # we want to be very sure we reset this or we'll
                     # keep hitting the RuntimeError above as soon as
@@ -53,23 +76,34 @@ def _needs_document_lock(func):
                     pending_writes = self._pending_writes
                     self._pending_writes = None
                 for p in pending_writes:
-                    yield p
-            raise gen.Return(result)
+                    await p
+            return result
         finally:
             self.unblock_expiration()
     return _needs_document_lock_wrapper
 
-class ServerSession(object):
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+def current_time():
+    '''Return the time in milliseconds since the epoch as a floating
+       point number.
+    '''
+    return time.monotonic() * 1000
+
+class ServerSession:
     ''' Hosts an application "instance" (an instantiated Document) for one or more connections.
 
     '''
 
-    def __init__(self, session_id, document, io_loop=None):
+    def __init__(self, session_id, document, io_loop=None, token=None):
         if session_id is None:
             raise ValueError("Sessions must have an id")
         if document is None:
             raise ValueError("Sessions must have a document")
         self._id = session_id
+        self._token = token
         self._document = document
         self._loop = io_loop
         self._subscribed_connections = set()
@@ -95,6 +129,13 @@ class ServerSession(object):
         return self._id
 
     @property
+    def token(self):
+        ''' A JWT token to authenticate the session. '''
+        if self._token:
+            return self._token
+        return generate_jwt_token(self.id)
+
+    @property
     def destroyed(self):
         return self._destroyed
 
@@ -112,9 +153,12 @@ class ServerSession(object):
 
     def destroy(self):
         self._destroyed = True
-        self._document.delete_modules()
-        self._document.remove_on_change(self)
+
+        self._document.destroy(self)
+        del self._document
+
         self._callbacks.remove_all_callbacks()
+        del self._callbacks
 
     def request_expiration(self):
         """ Used in test suite for now. Forces immediate expiration if no connections."""
@@ -129,11 +173,11 @@ class ServerSession(object):
         self._expiration_blocked_count -= 1
 
     def subscribe(self, connection):
-        """This should only be called by ServerConnection.subscribe_session or our book-keeping will be broken"""
+        """This should only be called by ``ServerConnection.subscribe_session`` or our book-keeping will be broken"""
         self._subscribed_connections.add(connection)
 
     def unsubscribe(self, connection):
-        """This should only be called by ServerConnection.unsubscribe_session or our book-keeping will be broken"""
+        """This should only be called by ``ServerConnection.unsubscribe_session`` or our book-keeping will be broken"""
         self._subscribed_connections.discard(connection)
         self._last_unsubscribe_time = current_time()
 
@@ -220,17 +264,16 @@ class ServerSession(object):
 
         return connection.ok(message)
 
-    @_needs_document_lock
-    def _handle_event(self, message, connection):
-        message.notify_event(self.document)
-        return connection.ok(message)
-
-    @classmethod
-    def event(cls, message, connection):
-        return connection.session._handle_event(message, connection)
-
-
     @classmethod
     def patch(cls, message, connection):
         ''' Handle a PATCH-DOC, return a Future with work to be scheduled. '''
         return connection.session._handle_patch(message, connection)
+
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

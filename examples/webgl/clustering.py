@@ -1,17 +1,16 @@
-""" Example inspired by an example from the scikit-learn project:
+''' Example inspired by an example from the scikit-learn project:
+
 http://scikit-learn.org/stable/auto_examples/cluster/plot_cluster_comparison.html
-"""
 
+'''
 import numpy as np
+from sklearn import cluster, datasets
+from sklearn.preprocessing import StandardScaler
 
-try:
-    from sklearn import cluster, datasets
-    from sklearn.preprocessing import StandardScaler
-except ImportError:
-    raise ImportError('This example requires scikit-learn (conda install sklearn)')
+from bokeh.layouts import column, row
+from bokeh.plotting import figure, output_file, show
 
-from bokeh.layouts import row, column
-from bokeh.plotting import figure, show, output_file
+print("\n\n*** This example may take several seconds to run before displaying. ***\n\n")
 
 N = 50000
 PLOT_SIZE = 400
@@ -52,7 +51,7 @@ for dataset in (noisy_circles, noisy_moons, blobs1, blobs2):
     p = figure(output_backend="webgl", title=algorithm.__class__.__name__,
                plot_width=PLOT_SIZE, plot_height=PLOT_SIZE)
 
-    p.scatter(X[:, 0], X[:, 1], color=colors[y_pred].tolist(), alpha=0.1,)
+    p.circle(X[:, 0], X[:, 1], color=colors[y_pred].tolist(), alpha=0.1,)
 
     plots.append(p)
 

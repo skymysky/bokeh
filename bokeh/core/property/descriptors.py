@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide Python descriptors for delegating to Bokeh properties.
 
 The Python `descriptor protocol`_ allows fine-grained control over all
@@ -6,7 +12,7 @@ descriptor protocol to provide easy-to-use, declarative, type-based
 class properties that can automatically validate and serialize their
 values, as well as help provide sophisticated documentation.
 
-A Bokeh property really consist of two parts: a familar "property"
+A Bokeh property really consist of two parts: a familiar "property"
 portion, such as ``Int``, ``String``, etc., as well as an associated
 Python descriptor that delegates attribute access to the property instance.
 
@@ -69,15 +75,44 @@ that can be used to attach Bokeh properties to Bokeh models.
 .. _descriptor protocol: https://docs.python.org/3/howto/descriptor.html
 
 '''
-from __future__ import absolute_import
 
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 from copy import copy
 
-from six import string_types
+# Bokeh imports
+from .wrappers import PropertyValueColumnData, PropertyValueContainer
 
-from .containers import PropertyValueContainer
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-class PropertyDescriptor(object):
+__all__ = (
+    'BasicPropertyDescriptor',
+    'ColumnDataPropertyDescriptor',
+    'DataSpecPropertyDescriptor',
+    'PropertyDescriptor',
+    'UnitsSpecPropertyDescriptor',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class PropertyDescriptor:
     ''' Base class for a python descriptor that delegates access for a named
     attribute to a Bokeh |Property| instance.
 
@@ -208,7 +243,8 @@ class PropertyDescriptor(object):
             None
 
         '''
-        from ..properties import DataSpec, ContainerProperty
+        from .bases import ContainerProperty
+        from .dataspec import DataSpec
         name = self.name
         if name in new_class_attrs:
             raise RuntimeError("Two property generators both created %s.%s" % (class_name, name))
@@ -393,7 +429,7 @@ class PropertyDescriptor(object):
         raise NotImplementedError("Implement _internal_set()")
 
 class BasicPropertyDescriptor(PropertyDescriptor):
-    ''' A PropertyDescriptor for basic Bokeh properties (e.g, ``Int``,
+    ''' A ``PropertyDescriptor`` for basic Bokeh properties (e.g, ``Int``,
     ``String``, ``Float``, etc.) with simple get/set and serialization
     behavior.
 
@@ -407,7 +443,7 @@ class BasicPropertyDescriptor(PropertyDescriptor):
             property (Property) : A basic property to create a descriptor for
 
         '''
-        super(BasicPropertyDescriptor, self).__init__(name)
+        super().__init__(name)
         self.property = property
         self.__doc__ = self.property.__doc__
 
@@ -571,7 +607,7 @@ class BasicPropertyDescriptor(PropertyDescriptor):
             None
 
         '''
-        return super(BasicPropertyDescriptor, self).set_from_json(obj,
+        return super().set_from_json(obj,
                                                         self.property.from_json(json, models),
                                                         models, setter)
 
@@ -873,8 +909,16 @@ class BasicPropertyDescriptor(PropertyDescriptor):
             obj.trigger(self.name, old, value, hint, setter)
 
 
+_CDS_SET_FROM_CDS_ERROR = """
+ColumnDataSource.data properties may only be set from plain Python dicts,
+not other ColumnDataSource.data values.
+
+If you need to copy set from one CDS to another, make a shallow copy by
+calling dict: s1.data = dict(s2.data)
+"""
+
 class ColumnDataPropertyDescriptor(BasicPropertyDescriptor):
-    ''' A PropertyDescriptor specialized to handling ``ColumnData`` properties.
+    ''' A ``PropertyDescriptor`` specialized to handling ``ColumnData`` properties.
 
     '''
 
@@ -921,6 +965,9 @@ class ColumnDataPropertyDescriptor(BasicPropertyDescriptor):
         if self.property._readonly:
             raise RuntimeError("%s.%s is a readonly property" % (obj.__class__.__name__, self.name))
 
+        if isinstance(value, PropertyValueColumnData):
+            raise ValueError(_CDS_SET_FROM_CDS_ERROR)
+
         from ...document.events import ColumnDataChangedEvent
 
         if obj.document:
@@ -931,7 +978,7 @@ class ColumnDataPropertyDescriptor(BasicPropertyDescriptor):
         self._internal_set(obj, value, hint=hint, setter=setter)
 
 class DataSpecPropertyDescriptor(BasicPropertyDescriptor):
-    ''' A PropertyDescriptor for Bokeh |DataSpec| properties that serialize to
+    ''' A ``PropertyDescriptor`` for Bokeh |DataSpec| properties that serialize to
     field/value dictionaries.
 
     '''
@@ -975,18 +1022,18 @@ class DataSpecPropertyDescriptor(BasicPropertyDescriptor):
             old = getattr(obj, self.name)
             if old is not None:
                 try:
-                    self.property._type.validate(old)
+                    self.property._type.validate(old, False)
                     if 'value' in json:
                         json = json['value']
                 except ValueError:
-                    if isinstance(old, string_types) and 'field' in json:
+                    if isinstance(old, str) and 'field' in json:
                         json = json['field']
                 # leave it as a dict if 'old' was a dict
 
-        super(DataSpecPropertyDescriptor, self).set_from_json(obj, json, models, setter)
+        super().set_from_json(obj, json, models, setter)
 
 class UnitsSpecPropertyDescriptor(DataSpecPropertyDescriptor):
-    ''' A PropertyDecscriptor for Bokeh |UnitsSpec| properties that contribute
+    ''' A ``PropertyDecscriptor`` for Bokeh |UnitsSpec| properties that contribute
     associated ``_units`` properties automatically as a side effect.
 
     '''
@@ -1005,7 +1052,7 @@ class UnitsSpecPropertyDescriptor(DataSpecPropertyDescriptor):
                 An associated property to hold units information
 
         '''
-        super(UnitsSpecPropertyDescriptor, self).__init__(name, property)
+        super().__init__(name, property)
         self.units_prop = units_property
 
     def __set__(self, obj, value, setter=None):
@@ -1044,7 +1091,7 @@ class UnitsSpecPropertyDescriptor(DataSpecPropertyDescriptor):
 
         '''
         value = self._extract_units(obj, value)
-        super(UnitsSpecPropertyDescriptor, self).__set__(obj, value, setter)
+        super().__set__(obj, value, setter)
 
     def set_from_json(self, obj, json, models=None, setter=None):
         ''' Sets the value of this property from a JSON value.
@@ -1081,7 +1128,7 @@ class UnitsSpecPropertyDescriptor(DataSpecPropertyDescriptor):
 
         '''
         json = self._extract_units(obj, json)
-        super(UnitsSpecPropertyDescriptor, self).set_from_json(obj, json, models, setter)
+        super().set_from_json(obj, json, models, setter)
 
     def _extract_units(self, obj, value):
         ''' Internal helper for dealing with units associated units properties
@@ -1106,3 +1153,11 @@ class UnitsSpecPropertyDescriptor(DataSpecPropertyDescriptor):
             if units:
                 self.units_prop.__set__(obj, units)
         return value
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

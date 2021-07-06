@@ -1,16 +1,43 @@
-from __future__ import absolute_import, print_function
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 
-from ..exceptions import ProtocolError
-from ..message import Message
-from . import register
-
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
-@register
-class pull_doc_reply_1(Message):
-    ''' Define the ``PULL-DOC-REPLY`` message (revision 1) for replying to
-    Document pull requests from clients
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ..exceptions import ProtocolError
+from ..message import Message
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'pull_doc_reply',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+class pull_doc_reply(Message):
+    ''' Define the ``PULL-DOC-REPLY`` message for replying to Document pull
+    requests from clients
 
     The ``content`` fragment of for this message is has the form:
 
@@ -23,10 +50,9 @@ class pull_doc_reply_1(Message):
     '''
 
     msgtype  = 'PULL-DOC-REPLY'
-    revision = 1
 
     def __init__(self, header, metadata, content):
-        super(pull_doc_reply_1, self).__init__(header, metadata, content)
+        super().__init__(header, metadata, content)
 
     @classmethod
     def create(cls, request_id, document, **metadata):
@@ -55,3 +81,11 @@ class pull_doc_reply_1(Message):
         if 'doc' not in self.content:
             raise ProtocolError("No doc in PULL-DOC-REPLY")
         doc.replace_with_json(self.content['doc'])
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

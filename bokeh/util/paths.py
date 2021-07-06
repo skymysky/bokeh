@@ -1,11 +1,41 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import sys
-from os.path import join, dirname, abspath, normpath, realpath, isdir
+from os.path import abspath, dirname, isdir, join, normpath, realpath
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
 # Root dir of Bokeh package
 ROOT_DIR = dirname(dirname(abspath(__file__)))
 
+__all__ = (
+    'serverdir',
+    'bokehjsdir',
+)
 
-def serverdir():
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+def serverdir() -> str:
     """ Get the location of the server subpackage
     """
     path = join(ROOT_DIR, 'server')
@@ -14,7 +44,7 @@ def serverdir():
     return path
 
 
-def bokehjsdir(dev=False):
+def bokehjsdir(dev: bool = False) -> str:
     """ Get the location of the bokehjs source files. If dev is True,
     the files in bokehjs/build are preferred. Otherwise uses the files
     in bokeh/server/static.
@@ -25,3 +55,15 @@ def bokehjsdir(dev=False):
         return dir1
     else:
         return dir2
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

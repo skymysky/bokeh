@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Define standard endpoints and their associated views for a Bokeh Server
 application.
 
@@ -34,19 +40,48 @@ built-in ``HTTPServer``.
         ]
 
 '''
-from __future__ import absolute_import
+# Please update the docstring above if any changes are made below
 
-from .views.ws import WSHandler
-from .views.root_handler import RootHandler
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Bokeh imports
+from ..embed.bundle import extension_dirs
+from .views.autoload_js_handler import AutoloadJsHandler
 from .views.doc_handler import DocHandler
 from .views.metadata_handler import MetadataHandler
+from .views.multi_root_static_handler import MultiRootStaticHandler
+from .views.root_handler import RootHandler
 from .views.static_handler import StaticHandler
-from .views.autoload_js_handler import AutoloadJsHandler
+from .views.ws import WSHandler
 
-# Please update the docstring above if any changes are made below
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'per_app_patterns',
+    'toplevel_patterns',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 toplevel_patterns = [
     (r'/?', RootHandler),
+    (r'/static/extensions/(.*)', MultiRootStaticHandler, dict(root=extension_dirs)),
     (r'/static/(.*)', StaticHandler),
 ]
 
@@ -56,3 +91,11 @@ per_app_patterns = [
     (r'/metadata', MetadataHandler),
     (r'/autoload.js', AutoloadJsHandler),
 ]
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

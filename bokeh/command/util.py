@@ -1,23 +1,58 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide utility functions for implementing the ``bokeh`` command.
 
 '''
-from __future__ import print_function
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import contextlib
 import errno
-import logging
 import os
 import sys
 import warnings
+from typing import Dict, Iterator, List, Optional, Sequence
 
+# Bokeh imports
 from bokeh.application import Application
-from bokeh.application.handlers import ScriptHandler, DirectoryHandler, NotebookHandler
+from bokeh.application.handlers import (
+    DirectoryHandler,
+    Handler,
+    NotebookHandler,
+    ScriptHandler,
+)
+from bokeh.document import Document
+from bokeh.models import Plot
 
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-log = logging.getLogger(__name__)
+__all__ = (
+    'build_single_handler_application',
+    'build_single_handler_applications',
+    'die',
+    'report_server_init_errors',
+    'set_single_plot_width_height',
+)
 
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
-def die(message, status=1):
+def die(message: str, status: Optional[int] = 1) -> None:
     ''' Print an error message and exit.
 
     This function will call ``sys.exit`` with the given ``status`` and the
@@ -39,10 +74,10 @@ call "bokeh serve" on the directory instead. For example:
 
     bokeh serve my_app_dir/
 
-If this is not the case, renaming main.py will supress this warning.
+If this is not the case, renaming main.py will suppress this warning.
 """
 
-def build_single_handler_application(path, argv=None):
+def build_single_handler_application(path: str, argv: Optional[Sequence[str]] = None) -> Application:
     ''' Return a Bokeh application built using a single handler for a script,
     notebook, or directory.
 
@@ -81,9 +116,14 @@ def build_single_handler_application(path, argv=None):
     '''
     argv = argv or []
     path = os.path.abspath(path)
+    handler: Handler
+
+    # There are certainly race conditions here if the file/directory is deleted
+    # in between the isdir/isfile tests and subsequent code. But it would be a
+    # failure if they were not there to begin with, too (just a different error)
     if os.path.isdir(path):
         handler = DirectoryHandler(filename=path, argv=argv)
-    else:
+    elif os.path.isfile(path):
         if path.endswith(".ipynb"):
             handler = NotebookHandler(filename=path, argv=argv)
         elif path.endswith(".py"):
@@ -92,6 +132,8 @@ def build_single_handler_application(path, argv=None):
             handler = ScriptHandler(filename=path, argv=argv)
         else:
             raise ValueError("Expected a '.py' script or '.ipynb' notebook, got: '%s'" % path)
+    else:
+        raise ValueError("Path for Bokeh server application does not exist: %s" % path)
 
     if handler.failed:
         raise RuntimeError("Error loading %s:\n\n%s\n%s " % (path, handler.error, handler.error_detail))
@@ -100,7 +142,7 @@ def build_single_handler_application(path, argv=None):
 
     return application
 
-def build_single_handler_applications(paths, argvs=None):
+def build_single_handler_applications(paths: List[str], argvs: Optional[Dict[str, List[str]]] = None) -> Dict[str, Application]:
     ''' Return a dictionary mapping routes to Bokeh applications built using
     single handlers, for specified files or directories.
 
@@ -109,7 +151,7 @@ def build_single_handler_applications(paths, argvs=None):
     to generate the mapping.
 
     Args:
-        path (seq[str]) : paths to files or directories for creating Bokeh
+        paths (seq[str]) : paths to files or directories for creating Bokeh
             applications.
 
         argvs (dict[str, list[str]], optional) : mapping of paths to command
@@ -122,8 +164,8 @@ def build_single_handler_applications(paths, argvs=None):
         RuntimeError
 
     '''
-    applications = {}
-    argvs = {} or argvs
+    applications: Dict[str, Application] = {}
+    argvs = argvs or {}
 
     for path in paths:
         application = build_single_handler_application(path, argvs.get(path, []))
@@ -140,7 +182,7 @@ def build_single_handler_applications(paths, argvs=None):
 
 
 @contextlib.contextmanager
-def report_server_init_errors(address=None, port=None, **kwargs):
+def report_server_init_errors(address: Optional[str] = None, port: Optional[int] = None, **kwargs: str) -> Iterator[None]:
     ''' A context manager to help print more informative error messages when a
     ``Server`` cannot be started due to a network problem.
 
@@ -163,7 +205,7 @@ def report_server_init_errors(address=None, port=None, **kwargs):
     '''
     try:
         yield
-    except EnvironmentError as e:
+    except OSError as e:
         if e.errno == errno.EADDRINUSE:
             log.critical("Cannot start Bokeh server, port %s is already in use", port)
         elif e.errno == errno.EADDRNOTAVAIL:
@@ -172,3 +214,28 @@ def report_server_init_errors(address=None, port=None, **kwargs):
             codename = errno.errorcode[e.errno]
             log.critical("Cannot start Bokeh server [%s]: %r", codename, e)
         sys.exit(1)
+
+def set_single_plot_width_height(doc: Document, width: Optional[int], height: Optional[int]) -> None:
+    if width is not None or height is not None:
+        layout = doc.roots
+        if len(layout) != 1 or not isinstance(layout[0], Plot):
+            warnings.warn("Width/height arguments will be ignored for this muliple layout. (Size valus only apply when exporting single plots.)")
+        else:
+            plot = layout[0]
+            # TODO - below fails mypy check
+            # unsure how to handle with typing. width is int base type and class property getter is typing.Int
+            # plot.plot_width  = width if width is not None else plot.plot_width  # doesnt solve problem
+            plot.plot_height = height or plot.plot_height
+            plot.plot_width  = width or plot.plot_width
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

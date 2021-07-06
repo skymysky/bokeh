@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -27,12 +26,8 @@ and the value is a dictionary with the structure:
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
@@ -40,8 +35,6 @@ from bokeh.util.api import public, internal ; public, internal
 
 # Standard library imports
 import csv
-
-# External imports
 
 # Bokeh imports
 from ..util.sampledata import external_path, open_csv
@@ -59,11 +52,11 @@ __all__ = (
 )
 
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -86,7 +79,7 @@ def _read_data(name):
     }
     with open_csv(filename) as f:
         next(f)
-        reader = csv.reader(f, delimiter=str(','))
+        reader = csv.reader(f, delimiter=",")
         for row in reader:
             date, open_price, high, low, close, volume, adj_close = row
             data['date'].append(date)

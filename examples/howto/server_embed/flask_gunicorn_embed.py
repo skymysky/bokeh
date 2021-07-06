@@ -1,5 +1,11 @@
-from flask import Flask, render_template
+try:
+    import asyncio
+except ImportError:
+    raise RuntimeError("This example requries Python3 / asyncio")
 
+from threading import Thread
+
+from flask import Flask, render_template
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import IOLoop
 
@@ -9,6 +15,7 @@ from bokeh.embed import server_document
 from bokeh.layouts import column
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.plotting import figure
+from bokeh.sampledata.sea_surface_temperature import sea_surface_temperature
 from bokeh.server.server import BaseServer
 from bokeh.server.tornado import BokehTornado
 from bokeh.server.util import bind_sockets
@@ -23,11 +30,10 @@ if __name__ == '__main__':
     import sys
     sys.exit()
 
-from bokeh.sampledata.sea_surface_temperature import sea_surface_temperature
 
 app = Flask(__name__)
 
-def modify_doc(doc):
+def bkapp(doc):
     df = sea_surface_temperature.copy()
     source = ColumnDataSource(data=df)
 
@@ -39,8 +45,8 @@ def modify_doc(doc):
         if new == 0:
             data = df
         else:
-            data = df.rolling('{0}D'.format(new)).mean()
-        source.data = ColumnDataSource(data=data).data
+            data = df.rolling(f"{new}D").mean()
+        source.data = ColumnDataSource.from_df(data)
 
     slider = Slider(start=0, end=30, value=0, step=1, title="Smoothing by N Days")
     slider.on_change('value', callback)
@@ -49,15 +55,12 @@ def modify_doc(doc):
 
     doc.theme = Theme(filename="theme.yaml")
 
-bkapp = Application(FunctionHandler(modify_doc))
-
-bokeh_tornado = BokehTornado({'/bkapp': bkapp}, extra_websocket_origins=["localhost:8000"])
-bokeh_http = HTTPServer(bokeh_tornado)
+# can't use shortcuts here, since we are passing to low level BokehTornado
+bkapp = Application(FunctionHandler(bkapp))
 
 # This is so that if this app is run using something like "gunicorn -w 4" then
 # each process will listen on its own port
 sockets, port = bind_sockets("localhost", 0)
-bokeh_http.add_sockets(sockets)
 
 @app.route('/', methods=['GET'])
 def bkapp_page():
@@ -65,10 +68,16 @@ def bkapp_page():
     return render_template("embed.html", script=script, template="Flask")
 
 def bk_worker():
-    io_loop = IOLoop.current()
-    server = BaseServer(io_loop, bokeh_tornado, bokeh_http)
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+    bokeh_tornado = BokehTornado({'/bkapp': bkapp}, extra_websocket_origins=["localhost:8000"])
+    bokeh_http = HTTPServer(bokeh_tornado)
+    bokeh_http.add_sockets(sockets)
+
+    server = BaseServer(IOLoop.current(), bokeh_tornado, bokeh_http)
     server.start()
     server.io_loop.start()
 
-from threading import Thread
-Thread(target=bk_worker).start()
+t = Thread(target=bk_worker)
+t.daemon = True
+t.start()

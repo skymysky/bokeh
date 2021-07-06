@@ -19,76 +19,82 @@ extra:
 
 requirements:
   build:
-    - python
-    - setuptools
-    - nodejs >=6.10.0
-    - certifi
-    - pycurl
-    - packaging
-    - six
-    - python-dateutil
-    - numpy
-    - yaml
-    - pyyaml
     - jinja2
-    - tornado >=4.3
+    - nodejs >=10.13
+    - numpy
+    - packaging
+    - python
+    - python-dateutil
+    - pyyaml
+    - ripgrep
+    - setuptools
+    - tornado >=5
+    - yaml
+
+  host:
+    - python >=3.6
 
   run:
-    - python
+    - python >=3.6
 
     {% for dep in data['install_requires'] %}
     - {{ dep.lower() }}
     {% endfor %}
 
-    # meta-package installs futures for 2.7 but not for 3.x
-    # needed in order to be able to build no-arch conda packages
-    - futures-compat
-
 test:
   requires:
+    # jinja2 installed by bokeh
+    # packaging installed by bokeh
+    # pyyaml installed by bokeh
+
     # docs
     - colorcet
     - pygments
-    - sphinx <1.6
-    # pyyaml installed by bokeh
-    # packaging installed by bokeh
+    - sphinx >=1.8
 
     # tests
-    - colorama
-    - coverage
-    - flake8
-    - lxml
-    - networkx
-    - mock
-    - packaging
-    - pandas
-    - pytest >=3.0.2
-    - pytest-catchlog >=1.2.2
-    - pytest-cov >=1.8.1
-    - pytest-selenium >=1.6.0 [unix]
-    - pytest-html
-    - selenium >=3
-    - pytest-xdist
-    - pytest-rerunfailures
-    - requests >=1.2.3
     - beautifulsoup4
-    - scipy
+    - colorama
+    - channels
+    - coverage
+    - firefox
+    - flake8
+    - flaky
+    - geckodriver
+    - ipython
+    - isort >=4.3.21
+    - mock
+    - mypy
+    - nbconvert >=5.4
+    - networkx
+    - nodejs >=10.13
     - numba
-    - pillow
-    - boto
-    - nodejs >=6.10.0
-    # pyyaml installed by bokeh
-    # jinja2 installed by bokeh
+    - pandas
+    - psutil
+    - pytest
+    - pytest-asyncio
+    - pytest-cov >=1.8.1
+    - pytest-html
+    - pytest-xdist
+    - requests >=1.2.3
+    - selenium >=3.8
+    - scipy
 
     # examples
-    - notebook
-    - sympy
-    - scikit-learn
-    - networkx
+    - flask >=1.0
+    - django
+    - h5py
     - icalendar
-    - flask
-    - flexx
+    - networkx
+    - notebook
+    - opencv
     - pyshp
+    - scikit-learn
+    - sympy
+    #- ipywidgets_bokeh >=1.0.0
+    #- ipywidgets >=7.5.0
+    #- ipyvolume
+    #- ipyleaflet
 
   commands:
     - bokeh -h
@@ -100,3 +106,10 @@ about:
   home: {{ data['url'] }}
   license: {{ data['license'] }}
   summary: {{ data['description'] }}
+
+extra:
+  deploy:
+    - anaconda-client
+    - boto
+    - setuptools >=0.39
+    - twine >=1.11

@@ -1,14 +1,44 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide a request handler that returns a page displaying a document.
 
 '''
-from __future__ import absolute_import, print_function
 
-import logging
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
 log = logging.getLogger(__name__)
 
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# External imports
 from tornado.web import StaticFileHandler
 
+# Bokeh imports
 from bokeh.settings import settings
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'StaticHandler',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class StaticHandler(StaticFileHandler):
     ''' Implements a custom Tornado static file handler for BokehJS
@@ -19,7 +49,7 @@ class StaticHandler(StaticFileHandler):
         kw['path'] = settings.bokehjsdir()
 
         # Note: tornado_app is stored as self.application
-        super(StaticHandler, self).__init__(tornado_app, *args, **kw)
+        super().__init__(tornado_app, *args, **kw)
 
     # We aren't using tornado's built-in static_path function
     # because it relies on TornadoApplication's autoconfigured
@@ -38,4 +68,12 @@ class StaticHandler(StaticFileHandler):
             return path
         else:
             version = StaticFileHandler.get_version(dict(static_path=settings.bokehjsdir()), path)
-            return ("%s?v=%s" % (path, version))
+            return f"{path}?v={version}"
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

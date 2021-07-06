@@ -1,3 +1,9 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Provide base classes for the Bokeh property system.
 
 .. note::
@@ -7,23 +13,52 @@
     anyone who is not directly developing on Bokeh's own infrastructure.
 
 '''
-from __future__ import absolute_import
 
-import logging
-logger = logging.getLogger(__name__)
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
 
-from copy import copy
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 import types
+from copy import copy
 
-from six import string_types
+# External imports
 import numpy as np
 
+# Bokeh imports
 from ...util.dependencies import import_optional
 from ...util.string import nice_join
+from ..has_props import HasProps
 from .descriptor_factory import PropertyDescriptorFactory
 from .descriptors import BasicPropertyDescriptor
 
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
 pd = import_optional('pandas')
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'ContainerProperty',
+    'DeserializationError',
+    'PrimitiveProperty',
+    'Property',
+    'validation_on',
+)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
 class DeserializationError(Exception):
     pass
@@ -52,17 +87,20 @@ class Property(PropertyDescriptorFactory):
 
     '''
 
-    def __init__(self, default=None, help=None, serialized=True, readonly=False):
+    # This class attribute is controlled by external helper API for validation
+    _should_validate = True
+
+    def __init__(self, default=None, help=None, serialized=None, readonly=False):
         # This is how the descriptor is created in the class declaration.
-        self._serialized = False if readonly else serialized
+        if serialized is None:
+            self._serialized = False if readonly else True
+        else:
+            self._serialized = serialized
         self._readonly = readonly
         self._default = default
         self.__doc__ = help
         self.alternatives = []
         self.assertions = []
-
-        # "fail early" when a default is invalid
-        self.validate(self._raw_default())
 
     def __str__(self):
         return self.__class__.__name__
@@ -72,6 +110,7 @@ class Property(PropertyDescriptorFactory):
         ''' Generate a sphinx :class: link to this property.
 
         '''
+        # extra space at the end is unfortunately necessary to appease Sphinx
         return ":class:`~bokeh.core.properties.%s` " % cls.__name__
 
     @staticmethod
@@ -196,6 +235,9 @@ class Property(PropertyDescriptorFactory):
                     return False
                 return all(self.matches(new[k], old[k]) for k in new)
 
+            # FYI Numpy can erroneously raise a warning about elementwise
+            # comparison here when a timedelta is compared to another scalar.
+            # https://github.com/numpy/numpy/issues/10095
             return new == old
 
         # if the comparison fails for some reason, just punt and return no-match
@@ -228,13 +270,19 @@ class Property(PropertyDescriptorFactory):
         '''
         return value
 
-    def validate(self, value):
+    def validate(self, value, detail=True):
         ''' Determine whether we can set this property from this value.
 
         Validation happens before transform()
 
         Args:
             value (obj) : the value to validate against this property type
+            detail (bool, options) : whether to construct detailed exceptions
+
+                Generating detailed type validation error messages can be
+                expensive. When doing type checks internally that will not
+                escape exceptions to users, these messages can be skipped
+                by setting this value to False (default: True)
 
         Returns:
             None
@@ -256,7 +304,8 @@ class Property(PropertyDescriptorFactory):
 
         '''
         try:
-            self.validate(value)
+            if validation_on():
+                self.validate(value, False)
         except ValueError:
             return False
         else:
@@ -271,7 +320,8 @@ class Property(PropertyDescriptorFactory):
 
     def prepare_value(self, obj_or_cls, name, value):
         try:
-            self.validate(value)
+            if validation_on():
+                self.validate(value)
         except ValueError as e:
             for tp, converter in self.alternatives:
                 if tp.is_valid(value):
@@ -282,7 +332,6 @@ class Property(PropertyDescriptorFactory):
         else:
             value = self.transform(value)
 
-        from ..has_props import HasProps
         if isinstance(obj_or_cls, HasProps):
             obj = obj_or_cls
 
@@ -295,7 +344,7 @@ class Property(PropertyDescriptorFactory):
                 assert isinstance(result, bool)
 
                 if not result:
-                    if isinstance(msg_or_fn, string_types):
+                    if isinstance(msg_or_fn, str):
                         raise ValueError(msg_or_fn)
                     else:
                         msg_or_fn(obj, name, value)
@@ -338,7 +387,7 @@ class Property(PropertyDescriptorFactory):
         Args:
             fn (callable) :
                 A function accepting ``(obj, value)`` that returns True if the value
-                passes the assertion, or False othwise
+                passes the assertion, or False otherwise.
 
             msg_or_fn (str or callable) :
                 A message to print in case the assertion fails, or a function
@@ -368,7 +417,7 @@ class ParameterizedProperty(Property):
         elif isinstance(type_param, Property):
             return type_param
 
-        raise ValueError("expected a Propertyas type parameter, got %s" % type_param)
+        raise ValueError("expected a Property as type parameter, got %s" % type_param)
 
     @property
     def type_params(self):
@@ -397,19 +446,21 @@ class PrimitiveProperty(Property):
 
     _underlying_type = None
 
-    def validate(self, value):
-        super(PrimitiveProperty, self).validate(value)
+    def validate(self, value, detail=True):
+        super().validate(value, detail)
 
         if not (value is None or isinstance(value, self._underlying_type)):
-            raise ValueError("expected a value of type %s, got %s of type %s" %
-                (nice_join([ cls.__name__ for cls in self._underlying_type ]), value, type(value).__name__))
+            msg = "" if not detail else "expected a value of type %s, got %s of type %s" % (
+                nice_join([ cls.__name__ for cls in self._underlying_type ]), value, type(value).__name__
+            )
+            raise ValueError(msg)
 
     def from_json(self, json, models=None):
         if json is None or isinstance(json, self._underlying_type):
             return json
         else:
             expected = nice_join([ cls.__name__ for cls in self._underlying_type ])
-            raise DeserializationError("%s expected %s, got %s" % (self, expected, json))
+            raise DeserializationError("%s expected %s, got %s of type %s" % (self, expected, json, type(json).__name__))
 
     def _sphinx_type(self):
         return self._sphinx_prop_link()
@@ -422,3 +473,20 @@ class ContainerProperty(ParameterizedProperty):
     def _may_have_unstable_default(self):
         # all containers are mutable, so the default can be modified
         return True
+
+def validation_on():
+    ''' Check if property validation is currently active
+
+    Returns:
+        bool
+
+    '''
+    return Property._should_validate
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

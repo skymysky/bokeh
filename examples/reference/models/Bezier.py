@@ -1,8 +1,7 @@
 import numpy as np
 
-from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid
-from bokeh.models.glyphs import Bezier
 from bokeh.io import curdoc, show
+from bokeh.models import Bezier, ColumnDataSource, Grid, LinearAxis, Plot
 
 N = 9
 x = np.linspace(-2, 2, N)
@@ -19,14 +18,11 @@ source = ColumnDataSource(dict(
     )
 )
 
-xdr = DataRange1d()
-ydr = DataRange1d()
-
 plot = Plot(
-    title=None, x_range=xdr, y_range=ydr, plot_width=300, plot_height=300,
-    h_symmetry=False, v_symmetry=False, min_border=0, toolbar_location=None)
+    title=None, plot_width=300, plot_height=300,
+    min_border=0, toolbar_location=None)
 
-glyph = Bezier(x0="x", y0="y", x1="xp02", y1="y", cx0="xp01", cy0="yp01", cx1="xm01", cy1="ym01", line_color="#D95F02", line_width=2)
+glyph = Bezier(x0="x", y0="y", x1="xp02", y1="y", cx0="xp01", cy0="yp01", cx1="xm01", cy1="ym01", line_color="#d95f02", line_width=2)
 plot.add_glyph(source, glyph)
 
 xaxis = LinearAxis()

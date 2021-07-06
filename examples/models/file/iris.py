@@ -1,14 +1,10 @@
-from __future__ import print_function
-
-from bokeh.util.browser import view
 from bokeh.document import Document
 from bokeh.embed import file_html
-from bokeh.models.glyphs import Circle
-from bokeh.models import (
-    Plot, DataRange1d, LinearAxis, Grid, ColumnDataSource, PanTool, WheelZoomTool, Title
-)
+from bokeh.models import (Circle, ColumnDataSource, Grid, LinearAxis,
+                          PanTool, Plot, Title, WheelZoomTool,)
 from bokeh.resources import INLINE
 from bokeh.sampledata.iris import flowers
+from bokeh.util.browser import view
 
 colormap = {'setosa': 'red', 'versicolor': 'green', 'virginica': 'blue'}
 
@@ -24,10 +20,7 @@ source = ColumnDataSource(
     )
 )
 
-xdr = DataRange1d()
-ydr = DataRange1d()
-
-plot = Plot(x_range=xdr, y_range=ydr, plot_width=800, plot_height=400)
+plot = Plot(plot_width=800, plot_height=400)
 plot.title.text = "Iris Data"
 
 circle = Circle(
@@ -49,7 +42,7 @@ plot.add_tools(PanTool(), WheelZoomTool())
 
 # Add a caption as a title placed in "below" layout panel.
 msg = """The Iris flower data set, or Fisher's Iris data set, is a multivariate data set introduced by Ronald Fisher in his 1936 paper."""
-caption = Title(text=msg, align='left', text_font_size='10pt')
+caption = Title(text=msg, align='left', text_font_size='13px')
 plot.add_layout(caption, 'below')
 
 doc = Document()

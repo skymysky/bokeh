@@ -1,140 +1,108 @@
-import * as fs from "fs"
 import * as path from "path"
 import * as ts from "typescript"
-const coffee = require("coffee-script")
-const detective = require("detective")
-const less = require("less")
-import {argv} from "yargs"
+import lesscss from "less"
 
-const mkCoffeescriptError = (error: any, file?: string) => {
-  const message = error.message
+import {compiler_host, parse_tsconfig, default_transformers, compile_files, report_diagnostics, TSOutput, Inputs, Outputs} from "./compiler"
+import {rename, Path} from "./sys"
+import * as transforms from "./transforms"
 
-  if (error.location == null) {
-    const text = [file || "<string>", message].join(":")
-    return {message, text}
-  } else {
-    const location = error.location
+import * as tsconfig_json from "./tsconfig.ext.json"
 
-    const line = location.first_line + 1
-    const column = location.first_column + 1
-
-    const text = [file || "<string>", line, column, message].join(":")
-
-    let markerLen = 2
-    if (location.first_line === location.last_line)
-        markerLen += location.last_column - location.first_column
-
-    const extract = error.code.split('\n')[line - 1]
-
-    const annotated = [
-      text,
-      "  " + extract,
-      "  " + Array(column).join(' ') + Array(markerLen).join('^'),
-    ].join('\n')
-
-    return {message, line, column, text, extract, annotated}
-  }
+function parse_patched_tsconfig(base_dir: string, preconfigure: ts.CompilerOptions) {
+  // XXX: silence the config validator. We are providing inputs through `inputs` argument anyway.
+  const json = {...tsconfig_json, include: undefined, files: ["dummy.ts"]}
+  return parse_tsconfig(json, base_dir, preconfigure)
 }
 
-const mkLessError = (error: any, file?: string) => {
-  const message = error.message
-  const line = error.line
-  const column = error.column + 1
-  const text = [file || "<string>", line, column, message].join(":")
-  const extract = error.extract[line]
-  const annotated = [text, "  " + extract].join("\n")
-  return {message, line, column, text, extract, annotated}
-}
-
-const mkTypeScriptError = (diagnostic: ts.Diagnostic) => {
-  let {line, character: column} = diagnostic.file!.getLineAndCharacterOfPosition(diagnostic.start!)
-  line += 1
-  column += 1
-  const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-  const text = [diagnostic.file!.fileName, line, column, message].join(":")
-  return {message, line, column, text}
-}
-
-const reply = (data: any) => {
-  process.stdout.write(JSON.stringify(data))
-  process.stdout.write("\n")
-}
-
-const compile_and_resolve_deps = (input: {code: string, lang: string, file: string}) => {
-  let code: string
-
-  switch (input.lang) {
-    case "coffeescript":
-      try {
-        code = coffee.compile(input.code, {bare: true, shiftLine: true})
-      } catch (error) {
-        return reply({error: mkCoffeescriptError(error, input.file)})
-      }
-      break;
-    case "javascript":
-    case "typescript":
-      code = input.code
-      break;
-    case "less":
-      const options = {
-        paths: [path.dirname(input.file)],
-        compress: true,
-        ieCompat: false,
-      }
-      less.render(input.code, options, (error: any, output: any) => {
-        if (error != null)
-          reply({error: mkLessError(error, input.file)})
-        else
-          reply({code: output.css})
-      })
-      return
-    default:
-      throw new Error(`unsupported input type: ${input.lang}`)
+export function compile_typescript(base_dir: string, inputs: Inputs, bokehjs_dir: string): {outputs?: Outputs} & TSOutput {
+  const preconfigure: ts.CompilerOptions = {
+    module: ts.ModuleKind.CommonJS,
+    paths: {
+      "*": [
+        path.join(bokehjs_dir, "js/lib/*"),
+        path.join(bokehjs_dir, "js/types/*"),
+      ],
+    },
+    outDir: undefined,
   }
 
-  const result = ts.transpileModule(code, {
-    fileName: input.file,
+  const tsconfig = parse_patched_tsconfig(base_dir, preconfigure)
+  if (tsconfig.diagnostics != null)
+    return {diagnostics: tsconfig.diagnostics}
+
+  const host = compiler_host(inputs, tsconfig.options, bokehjs_dir)
+  const transformers = default_transformers(tsconfig.options)
+
+  const outputs: Outputs = new Map()
+  host.writeFile = (name: Path, data: string) => {
+    outputs.set(name, data)
+  }
+
+  const files = [...inputs.keys()]
+  return {outputs, ...compile_files(files, tsconfig.options, transformers, host)}
+}
+
+function compile_javascript(base_dir: string, file: string, code: string): { output?: string } & TSOutput {
+  const tsconfig = parse_patched_tsconfig(base_dir, {})
+  if (tsconfig.diagnostics != null)
+    return {diagnostics: tsconfig.diagnostics}
+
+  const {outputText, diagnostics} = ts.transpileModule(code, {
+    fileName: file,
     reportDiagnostics: true,
     compilerOptions: {
-      noEmitOnError: false,
-      noImplicitAny: false,
-      target: ts.ScriptTarget.ES5,
+      target: tsconfig.options.target,
       module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.React,
-      reactNamespace: "DOM",
     },
   })
-
-  if (result.diagnostics != null && result.diagnostics.length > 0) {
-    const diagnostic = result.diagnostics[0]
-    return reply({error: mkTypeScriptError(diagnostic)})
-  }
-
-  const source = result.outputText
-
-  try {
-    const deps = detective(source)
-    return reply({ code: source, deps: deps })
-  } catch(error) {
-    return reply({error: error})
-  }
+  return {output: outputText, diagnostics}
 }
 
-if (argv.file != null) {
-  const input = {
-    code: fs.readFileSync(argv.file, "utf-8"),
-    lang: argv.lang || "coffeescript",
-    file: argv.file,
+function normalize(path: string): string {
+  return path.replace(/\\/g, "/")
+}
+
+export async function compile_and_resolve_deps(input: {code: string, lang: string, file: string, bokehjs_dir: string}) {
+  const {file, lang, bokehjs_dir} = input
+  const {code} = input
+
+  let output: string
+  switch (lang) {
+    case "typescript":
+      const inputs = new Map([[normalize(file), code]])
+      const {outputs, diagnostics} = compile_typescript(".", inputs, bokehjs_dir)
+
+      if (diagnostics != null && diagnostics.length != 0) {
+        const failure = report_diagnostics(diagnostics)
+        return {error: failure.text}
+      } else {
+        const js_file = normalize(rename(file, {ext: ".js"}))
+        output = outputs!.get(js_file)!
+      }
+      break
+    case "javascript": {
+      const result = compile_javascript(".", file, code)
+      if (result.diagnostics != null && result.diagnostics.length != 0) {
+        const failure = report_diagnostics(result.diagnostics)
+        return {error: failure.text}
+      } else {
+        output = result.output!
+      }
+      break
+    }
+    case "less":
+      try {
+        const {css} = await lesscss.render(code, {filename: file, compress: true})
+        return {code: css}
+      } catch (error) {
+        return {error: error.toString()}
+      }
+    default:
+      throw new Error(`unsupported input type: ${lang}`)
   }
-  compile_and_resolve_deps(input)
-} else {
-  const stdin = process.stdin
 
-  stdin.resume()
-  stdin.setEncoding("utf-8")
+  const source = ts.createSourceFile(file, output, ts.ScriptTarget.ES5, true, ts.ScriptKind.JS)
+  const deps = transforms.collect_deps(source)
 
-  let data = ""
-
-  stdin.on("data", (chunk: string) => data += chunk)
-  stdin.on("end", () => compile_and_resolve_deps(JSON.parse(data)))
+  return {code: output, deps}
 }

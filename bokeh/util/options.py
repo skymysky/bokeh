@@ -1,8 +1,41 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 """ Utilities for specifying, validating, and documenting configuration
 options.
 
 """
+
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
+from typing import Any, Dict
+
+# Bokeh imports
 from ..core.has_props import HasProps
+
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
+
+__all__ = (
+    'Options',
+)
+
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
 class Options(HasProps):
     ''' Leverage the Bokeh properties type system for specifying and
@@ -29,12 +62,24 @@ class Options(HasProps):
 
     '''
 
-    def __init__(self, kw=None):
+    def __init__(self, kw: Dict[str, Any]) -> None:
 
         # remove any items that match our declared properties
-        props = {}
+        props: Dict[str, Any] = {}
         for k in self.properties():
             if k in kw:
                 props[k] = kw.pop(k)
 
-        super(Options, self).__init__(**props)
+        super().__init__(**props)
+
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------

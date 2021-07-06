@@ -1,15 +1,17 @@
 import numpy as np
-np.random.seed(0)
-
-from bokeh.io import curdoc
-from bokeh.layouts import widgetbox, row, column
-from bokeh.models import ColumnDataSource, Select, Slider
-from bokeh.plotting import figure
-from bokeh.palettes import Spectral6
-
 from sklearn import cluster, datasets
 from sklearn.neighbors import kneighbors_graph
 from sklearn.preprocessing import StandardScaler
+
+from bokeh.io import curdoc
+from bokeh.layouts import column, row
+from bokeh.models import ColumnDataSource, Select, Slider
+from bokeh.palettes import Spectral6
+from bokeh.plotting import figure
+
+np.random.seed(0)
+
+
 
 # define some helper functions
 def clustering(X, algorithm, n_clusters):
@@ -173,14 +175,14 @@ def update_samples_or_dataset(attrname, old, new):
     source.data = dict(colors=colors, x=X[:, 0], y=X[:, 1])
 
 algorithm_select.on_change('value', update_algorithm_or_clusters)
-clusters_slider.on_change('value', update_algorithm_or_clusters)
+clusters_slider.on_change('value_throttled', update_algorithm_or_clusters)
 
 dataset_select.on_change('value', update_samples_or_dataset)
-samples_slider.on_change('value', update_samples_or_dataset)
+samples_slider.on_change('value_throttled', update_samples_or_dataset)
 
 # set up layout
 selects = row(dataset_select, algorithm_select, width=420)
-inputs = column(selects, widgetbox(samples_slider, clusters_slider))
+inputs = column(selects, samples_slider, clusters_slider)
 
 # add to document
 curdoc().add_root(row(inputs, plot))

@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------
-# Copyright (c) 2012 - 2017, Anaconda, Inc. All rights reserved.
-#
-# Powered by the Bokeh Development Team.
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
 #
 # The full license is in the file LICENSE.txt, distributed with this software.
 #-----------------------------------------------------------------------------
@@ -12,29 +11,25 @@
 #-----------------------------------------------------------------------------
 # Boilerplate
 #-----------------------------------------------------------------------------
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import logging
+import logging # isort:skip
 log = logging.getLogger(__name__)
-
-from bokeh.util.api import public, internal ; public, internal
 
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
 
+# NOTE: since downloading sampledata is not a common occurrnce, non-stdlib
+# imports are generally deferrered in this module
+
 # Standard library imports
+import hashlib
+import json
 from os import mkdir, remove
 from os.path import abspath, dirname, exists, expanduser, isdir, isfile, join, splitext
 from sys import stdout
-from zipfile import ZipFile
-
-# External imports
-import six
-from six.moves.urllib.request import urlopen
-
-# Bokeh imports
-from .dependencies import import_required
+from typing import Any, TextIO, cast
+from urllib.parse import urljoin
+from urllib.request import urlopen
 
 #-----------------------------------------------------------------------------
 # Globals and constants
@@ -44,58 +39,55 @@ __all__ = (
     'download',
 )
 
+DataFrame = Any
+
 #-----------------------------------------------------------------------------
-# Public API
+# General API
 #-----------------------------------------------------------------------------
 
-@public((1,0,0))
-def download(progress=True):
+def download(progress: bool = True) -> None:
     ''' Download larger data sets for various Bokeh examples.
 
     '''
     data_dir = external_data_dir(create=True)
     print("Using data directory: %s" % data_dir)
 
-    s3 = 'https://s3.amazonaws.com/bokeh_data/'
-    files = [
-        (s3, 'CGM.csv'),
-        (s3, 'US_Counties.zip'),
-        (s3, 'us_cities.json'),
-        (s3, 'unemployment09.csv'),
-        (s3, 'AAPL.csv'),
-        (s3, 'FB.csv'),
-        (s3, 'GOOG.csv'),
-        (s3, 'IBM.csv'),
-        (s3, 'MSFT.csv'),
-        (s3, 'WPP2012_SA_DB03_POPULATION_QUINQUENNIAL.zip'),
-        (s3, 'gapminder_fertility.csv'),
-        (s3, 'gapminder_population.csv'),
-        (s3, 'gapminder_life_expectancy.csv'),
-        (s3, 'gapminder_regions.csv'),
-        (s3, 'world_cities.zip'),
-        (s3, 'airports.json'),
-        (s3, 'movies.db.zip'),
-        (s3, 'airports.csv'),
-        (s3, 'routes.csv'),
-    ]
+    # HTTP requests are cheaper for us, and there is nothing private to protect
+    s3 = 'http://sampledata.bokeh.org'
+    files = json.load(open(join(dirname(__file__), "sampledata.json")))
 
-    for base_url, filename in files:
-        _download_file(base_url, filename, data_dir, progress=progress)
+    for filename, md5 in files:
+        real_name, ext = splitext(filename)
+        if ext == '.zip':
+            if not splitext(real_name)[1]:
+                real_name += ".csv"
+        else:
+            real_name += ext
+        real_path = join(data_dir, real_name)
+
+        if exists(real_path):
+            local_md5 = hashlib.md5(open(real_path,'rb').read()).hexdigest()
+            if local_md5 == md5:
+                print(f"Skipping {filename!r} (checksum match)")
+                continue
+            else:
+                print(f"Re-fetching {filename!r} (checksum mismatch)")
+
+        _download_file(s3, filename, data_dir, progress=progress)
 
 #-----------------------------------------------------------------------------
-# Internal API
+# Dev API
 #-----------------------------------------------------------------------------
 
-@internal((1,0,0))
-def external_csv(module, name, **kw):
+def external_csv(module: str, name: str, **kw: Any) -> DataFrame:
     '''
 
     '''
+    from .dependencies import import_required
     pd = import_required('pandas', '%s sample data requires Pandas (http://pandas.pydata.org) to be installed' % module)
-    return pd.read_csv(external_path(name), **kw)
+    return cast(Any, pd).read_csv(external_path(name), **kw)
 
-@internal((1,0,0))
-def external_data_dir(create=False):
+def external_data_dir(create: bool = False) -> str:
     '''
 
     '''
@@ -108,9 +100,9 @@ def external_data_dir(create=False):
     data_dir = join(bokeh_dir, "data")
 
     try:
-        config = yaml.load(open(join(bokeh_dir, 'config')))
+        config = yaml.safe_load(open(join(bokeh_dir, 'config')))
         data_dir = expanduser(config['sampledata_dir'])
-    except (IOError, TypeError):
+    except (OSError, TypeError):
         pass
 
     if not exists(data_dir):
@@ -127,53 +119,45 @@ def external_data_dir(create=False):
 
     return data_dir
 
-@internal((1,0,0))
-def external_path(filename):
+def external_path(filename: str) -> str:
     data_dir = external_data_dir()
     fn = join(data_dir, filename)
     if not exists(fn) and isfile(fn):
-        raise RuntimeError('Could not locate external data file %e. Please execute bokeh.sampledata.download()' % fn)
+        raise RuntimeError('Could not locate external data file %s. Please execute bokeh.sampledata.download()' % fn)
     return fn
 
-@internal((1,0,0))
-def package_csv(module, name, **kw):
+def package_csv(module: str, name: str, **kw: Any) -> DataFrame:
     '''
 
     '''
+    from .dependencies import import_required
     pd = import_required('pandas', '%s sample data requires Pandas (http://pandas.pydata.org) to be installed' % module)
-    return pd.read_csv(package_path(name), **kw)
+    return cast(Any, pd).read_csv(package_path(name), **kw)
 
 
-@internal((1,0,0))
-def package_dir():
+def package_dir() -> str:
     '''
 
     '''
     return abspath(join(dirname(__file__), "..", "sampledata", "_data"))
 
-@internal((1,0,0))
-def package_path(filename):
+def package_path(filename: str) -> str:
     '''
 
     '''
     return join(package_dir(), filename)
 
-@internal((1,0,0))
-def open_csv(filename):
+def open_csv(filename: str) -> TextIO:
     '''
 
     '''
-    # csv differs in Python 2.x and Python 3.x. Open the file differently in each.
-    if six.PY2:
-        return open(filename, 'rb')
-    else:
-        return open(filename, 'r', newline='', encoding='utf8')
+    return open(filename, 'r', newline='', encoding='utf8')
 
 #-----------------------------------------------------------------------------
 # Private API
 #-----------------------------------------------------------------------------
 
-def _bokeh_dir(create=False):
+def _bokeh_dir(create: bool = False) -> str:
     '''
 
     '''
@@ -190,11 +174,16 @@ def _bokeh_dir(create=False):
             raise RuntimeError("%s exists but is not a directory" % bokeh_dir)
     return bokeh_dir
 
-def _download_file(base_url, filename, data_dir, progress=True):
+def _download_file(base_url: str, filename: str, data_dir: str, progress: bool = True) -> None:
     '''
 
     '''
-    file_url = join(base_url, filename)
+    # These are actually somewhat expensive imports that added ~5% to overall
+    # typical bokeh import times. Since downloading sampledata is not a common
+    # action, we defer them to inside this function.
+    from zipfile import ZipFile
+
+    file_url = urljoin(base_url, filename)
     file_path = join(data_dir, filename)
 
     url = urlopen(file_url)

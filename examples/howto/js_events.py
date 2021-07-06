@@ -4,11 +4,11 @@ of the color_scatter example from the bokeh gallery
 
 import numpy as np
 
-from bokeh.io import show, output_file
-from bokeh.plotting import figure
 from bokeh import events
-from bokeh.models import CustomJS, Div, Button
+from bokeh.io import output_file, show
 from bokeh.layouts import column, row
+from bokeh.models import Button, CustomJS, Div
+from bokeh.plotting import figure
 
 
 def display_event(div, attributes=[]):
@@ -16,12 +16,12 @@ def display_event(div, attributes=[]):
     Function to build a suitable CustomJS to display the current event
     in the div model.
     """
-    style = 'float:left;clear:left;font_size=0.5pt'
+    style = 'float: left; clear: left; font-size: 13px'
     return CustomJS(args=dict(div=div), code="""
         var attrs = %s;
         var args = [];
-        for (var i=0; i<attrs.length; i++ ) {
-            val = JSON.stringify(cb_obj[attrs[i]], function(key, val) {
+        for (var i = 0; i < attrs.length; i++) {
+            var val = JSON.stringify(cb_obj[attrs[i]], function(key, val) {
                 return val.toFixed ? Number(val.toFixed(2)) : val;
             })
             args.push(attrs[i] + '=' + val)
@@ -29,7 +29,8 @@ def display_event(div, attributes=[]):
         var line = "<span style=%r><b>" + cb_obj.event_name + "</b>(" + args.join(", ") + ")</span>\\n";
         var text = div.text.concat(line);
         var lines = text.split("\\n")
-        if ( lines.length > 35 ) { lines.shift(); }
+        if (lines.length > 35)
+            lines.shift();
         div.text = lines.join("\\n");
     """ % (attributes, style))
 
@@ -52,7 +53,7 @@ p.scatter(x, y, radius=radii,
 # Add a div to display events and a button to trigger button click events
 
 div = Div(width=1000)
-button = Button(label="Button", button_type="success")
+button = Button(label="Button", button_type="success", width=300)
 layout = column(button, row(p, div))
 
 
@@ -70,6 +71,7 @@ point_attributes = ['x','y','sx','sy']
 p.js_on_event(events.Tap,       display_event(div, attributes=point_attributes))
 p.js_on_event(events.DoubleTap, display_event(div, attributes=point_attributes))
 p.js_on_event(events.Press,     display_event(div, attributes=point_attributes))
+p.js_on_event(events.PressUp,   display_event(div, attributes=point_attributes))
 
 # Mouse wheel event
 p.js_on_event(events.MouseWheel, display_event(div,attributes=point_attributes+['delta']))

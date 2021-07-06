@@ -1,16 +1,42 @@
+#-----------------------------------------------------------------------------
+# Copyright (c) 2012 - 2020, Anaconda, Inc., and Bokeh Contributors.
+# All rights reserved.
+#
+# The full license is in the file LICENSE.txt, distributed with this software.
+#-----------------------------------------------------------------------------
 ''' Utilities for checking dependencies
 
 '''
+
+#-----------------------------------------------------------------------------
+# Boilerplate
+#-----------------------------------------------------------------------------
+import logging # isort:skip
+log = logging.getLogger(__name__)
+
+#-----------------------------------------------------------------------------
+# Imports
+#-----------------------------------------------------------------------------
+
+# Standard library imports
 from importlib import import_module
-import logging
-from subprocess import Popen, PIPE
+from types import ModuleType
+from typing import Optional
 
-from ..settings import settings
+#-----------------------------------------------------------------------------
+# Globals and constants
+#-----------------------------------------------------------------------------
 
-logger = logging.getLogger(__name__)
+__all__ = (
+    'import_optional',
+    'import_required',
+)
 
+#-----------------------------------------------------------------------------
+# General API
+#-----------------------------------------------------------------------------
 
-def import_optional(mod_name):
+def import_optional(mod_name: str) -> Optional[ModuleType]:
     ''' Attempt to import an optional dependency.
 
     Silently returns None if the requested module is not available.
@@ -27,10 +53,13 @@ def import_optional(mod_name):
     except ImportError:
         pass
     except Exception:
-        msg = "Failed to import optional module `{}`".format(mod_name)
-        logger.exception(msg)
+        msg = f"Failed to import optional module `{mod_name}`"
+        log.exception(msg)
 
-def import_required(mod_name, error_msg):
+    return None
+
+
+def import_required(mod_name: str, error_msg: str) -> ModuleType:
     ''' Attempt to import a required dependency.
 
     Raises a RuntimeError if the requested module is not available.
@@ -48,21 +77,17 @@ def import_required(mod_name, error_msg):
     '''
     try:
         return import_module(mod_name)
-    except ImportError:
-        raise RuntimeError(error_msg)
+    except ImportError as e:
+        raise RuntimeError(error_msg) from e
 
-def detect_phantomjs():
-    '''Detect if PhantomJS is avaiable in PATH.'''
-    if settings.phantomjs_path() is not None:
-        phantomjs_path = settings.phantomjs_path()
-    else:
-        phantomjs_path = "phantomjs"
+#-----------------------------------------------------------------------------
+# Dev API
+#-----------------------------------------------------------------------------
 
-    try:
-        proc = Popen([phantomjs_path, "--version"], stdout=PIPE, stderr=PIPE)
-        proc.wait()
-    except OSError:
-        raise RuntimeError('PhantomJS is not present in PATH. Try "conda install phantomjs" or \
-                           "npm install -g phantomjs-prebuilt"')
-    else:
-        return phantomjs_path
+#-----------------------------------------------------------------------------
+# Private API
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# Code
+#-----------------------------------------------------------------------------
